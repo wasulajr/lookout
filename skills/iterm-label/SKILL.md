@@ -12,58 +12,50 @@ Sets one shared string as both the iTerm2 badge (top-right watermark) and the wi
 - **`~/.claude/hooks/iterm-status.d/<session-key>.conf`** — per-session conf, sourced by the hook script after the global conf. Holds `iterm_badge_text()` and `iterm_title_text()` definitions that return the chosen label.
 - The directory `iterm-status.d/` is gitignored; nothing committed.
 
-## Determining the session key
-
-The current iTerm2 session is identified by the `ITERM_SESSION_ID` env var inherited from the iTerm2-spawned shell. The hook subprocess for the `claude` TUI inherits it; YOU running as a skill might not have it directly, so look it up from the parent `claude` TUI process:
-
-```bash
-SESSION_ID=$(ps eww -p $PPID 2>/dev/null | tr ' ' '\n' | grep '^ITERM_SESSION_ID=' | head -1 | cut -d= -f2-)
-```
-
-Then sanitize for use as a filename (colons aren't great for filenames):
-
-```bash
-SESSION_KEY=$(printf '%s' "$SESSION_ID" | tr -c '[:alnum:]-' '_')
-```
-
-If `SESSION_ID` comes back empty, abort with a clear error — the user is probably not in iTerm2, or running Claude Code via some path that doesn't propagate the var.
-
 ## Flow
 
-1. **Resolve session key** as above. Path is `~/.claude/hooks/iterm-status.d/${SESSION_KEY}.conf`.
-2. **Read the current label** by sourcing the existing per-session conf (if any) in a subshell and calling `iterm_badge_text`. If no per-session conf exists, the current label is whatever the global conf produces (probably the project name).
-3. **Ask the user what to name this session.** Don't ask about title and badge separately — they share one value here. The user gives one string.
-4. **Write the per-session conf file.** Create `~/.claude/hooks/iterm-status.d/` if it doesn't exist. The file content should be exactly this template (replace `LABEL_HERE` with the user's string):
+**Prompt-first design.** Do NOT run any Bash commands before you have the label. Reading the current label or looking up the session key first would trigger a permission prompt before the user has even been asked what they want — that's worse UX than skipping the current-label read. If the user wants to know the current label they'll ask.
 
-```bash
-# Per-iTerm2-session override for this pane.
-# Managed by the /iterm-label skill. Edits to this file are local-only —
-# the iterm-status.d/ directory is gitignored. ITERM_SESSION_ID changes
-# across iTerm2 restarts, so this file becomes stale after restart.
+1. **Get the label.**
+   - If the user passed an argument when invoking the skill (e.g. `/iterm-label deploy debugging`), use that argument verbatim as the label. Skip to step 2.
+   - Otherwise, **ask the user** what they want to call this tab. One question, one string (title and badge share it). Do this with `AskUserQuestion` or plain text — but before any tool calls.
 
-iterm_badge_text() {
-    printf 'LABEL_HERE'
-}
+2. **Run a single Bash command** that does everything: resolves the session key from `ITERM_SESSION_ID` (looked up from the parent `claude` TUI process via `ps eww -p $PPID`), creates `~/.claude/hooks/iterm-status.d/` if missing, writes the per-session conf, walks up `$PPID` to find a real tty, and writes the OSC sequences to apply badge + title immediately. Template:
 
-iterm_title_text() {
-    printf 'LABEL_HERE'
-}
-```
+   ```bash
+   LABEL='<user-supplied-label>'   # single-quote; escape any literal ' inside
+   SESSION_ID=$(ps eww -p $PPID 2>/dev/null | tr ' ' '\n' | grep '^ITERM_SESSION_ID=' | head -1 | cut -d= -f2-)
+   [ -z "$SESSION_ID" ] && { echo "ERROR: ITERM_SESSION_ID not found — are you in iTerm2?"; exit 1; }
+   SESSION_KEY=$(printf '%s' "$SESSION_ID" | tr -c '[:alnum:]-' '_')
+   CONF_DIR="$HOME/.claude/hooks/iterm-status.d"
+   CONF="$CONF_DIR/${SESSION_KEY}.conf"
+   mkdir -p "$CONF_DIR"
+   cat > "$CONF" <<EOF
+   # Per-iTerm2-session override for this pane.
+   # Managed by /iterm-label. Local-only — iterm-status.d/ is gitignored.
+   # ITERM_SESSION_ID changes across iTerm2 restarts, so this becomes stale.
 
-Use `printf` (not `echo`) so the string is taken literally and special chars in the label aren't interpreted.
+   iterm_badge_text() { printf '%s' "$LABEL"; }
+   iterm_title_text() { printf '%s' "$LABEL"; }
+   EOF
+   # Walk up $PPID until a real tty appears
+   pid=$PPID; tty="??"
+   while [ "$tty" = "??" ] && [ "$pid" != "1" ]; do
+       tty=$(ps -o tty= -p "$pid" | tr -d ' '); [ -z "$tty" ] && tty="??"
+       pid=$(ps -o ppid= -p "$pid" | tr -d ' ')
+   done
+   if [ "$tty" != "??" ] && [ -w "/dev/$tty" ]; then
+       BADGE_B64=$(printf '%s' "$LABEL" | base64)
+       printf '\033]1337;SetBadgeFormat=%s\007\033]0;%s\007' "$BADGE_B64" "$LABEL" > "/dev/$tty"
+   fi
+   echo "Wrote $CONF and applied to /dev/$tty"
+   ```
 
-5. **Apply the label to this tab immediately.** Find the parent tty (`ps -o tty= -p $PPID`, walk up until non-`??`), then write:
+   Use `printf '%s' "$LABEL"` (not `echo`) inside the conf so special chars in the label aren't interpreted. Don't commit / push — `iterm-status.d/` is gitignored and per-session ephemeral.
 
-```
-OSC 1337 ; SetBadgeFormat=<base64-of-label> BEL
-OSC 0 ; <label> BEL
-```
+3. **Confirm to the user**, 1–2 sentences. "Label set to '<value>'. Visible in the badge now; persists until you restart iTerm2 (then run `/iterm-label` again)."
 
-Both as a single byte stream to `/dev/<tty>`. Note: the title may flicker if the user's iTerm2 profile doesn't have `Allow Title Setting: false` — Claude Code's TUI re-asserts the title on each render. Badge is stable regardless. Mention this caveat to the user only if you suspect they're in an ad-hoc (non-profile) session.
-
-6. **DON'T commit or push.** This file is gitignored and per-session ephemeral. Tell the user it'll persist while this iTerm2 session is alive but get re-keyed on iTerm2 restart.
-
-7. **Confirm to the user**: 1-2 sentences. "Label set to '<value>'. Visible in the badge now; persists until you restart iTerm2 (then run `/iterm-label` again)."
+The title may flicker if the user's iTerm2 profile doesn't have `Allow Title Setting: false` — Claude Code's TUI re-asserts the title on each render. Badge is stable regardless. Mention only if it actually misbehaves.
 
 ## Removing a label
 
