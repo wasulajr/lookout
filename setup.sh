@@ -37,7 +37,7 @@ confirm() {
 PROBLEMS=0
 
 # ── 1. Prerequisites ─────────────────────────────────────────────────────────
-header "Step 1/7 — checking prerequisites"
+header "Step 1/8 — checking prerequisites"
 
 if [ "$(uname -s)" != "Darwin" ]; then
     fatal "macOS only (saw $(uname -s))."
@@ -86,16 +86,15 @@ else
     note "  install:  brew install jq"
 fi
 
-# terminal-notifier is OPTIONAL — only used by /iterm-notifications and
-# only to render the Claude icon. Falls back to osascript (which shows
-# the Script Editor icon) if not installed. Don't count as a prereq
-# problem; just a recommendation.
-if command -v terminal-notifier >/dev/null 2>&1; then
-    ok "terminal-notifier $(terminal-notifier -version 2>&1 | head -1)"
+# swiftc compiles the bundled notifier (so wait-notifications can show
+# headsup's own icon instead of Script Editor's). Ships with Xcode
+# Command Line Tools.
+if command -v swiftc >/dev/null 2>&1; then
+    ok "swiftc $(swiftc --version | head -1 | awk '{print $3, $4}')"
 else
-    note "${DIM}optional:${RST} terminal-notifier not installed"
-    note "  ${DIM}install for the Claude icon in wait-notifications:${RST}  brew install terminal-notifier"
-    note "  ${DIM}(without it, notifications still fire but show the Script Editor icon)${RST}"
+    PROBLEMS=$((PROBLEMS + 1))
+    warn "swiftc not on PATH (needed to compile the notifier binary)"
+    note "  install:  xcode-select --install"
 fi
 
 if [ $PROBLEMS -gt 0 ]; then
@@ -104,7 +103,7 @@ if [ $PROBLEMS -gt 0 ]; then
 fi
 
 # ── 2. iTerm2 Python API ─────────────────────────────────────────────────────
-header "Step 2/7 — iTerm2 Python API"
+header "Step 2/8 — iTerm2 Python API"
 
 API_ENABLED=$(defaults read com.googlecode.iterm2 EnableAPIServer 2>/dev/null || echo "")
 if [ "$API_ENABLED" = "1" ]; then
@@ -122,7 +121,7 @@ else
 fi
 
 # ── 3. Python venv with iterm2 package ───────────────────────────────────────
-header "Step 3/7 — Python venv at $VENV"
+header "Step 3/8 — Python venv at $VENV"
 
 if [ -d "$VENV" ] && [ -x "$VENV/bin/python" ]; then
     if "$VENV/bin/python" -c 'import iterm2' 2>/dev/null; then
@@ -144,7 +143,7 @@ else
 fi
 
 # ── 4. Install hook scripts ──────────────────────────────────────────────────
-header "Step 4/7 — installing hook scripts into $CLAUDE_DIR/hooks/"
+header "Step 4/8 — installing hook scripts into $CLAUDE_DIR/hooks/"
 
 mkdir -p "$CLAUDE_DIR/hooks"
 installed=0; skipped=0; overwrote=0
@@ -182,8 +181,36 @@ for src in "$SCRIPT_DIR/hooks/"*; do
 done
 note "${installed} installed, ${overwrote} overwritten, ${skipped} skipped"
 
-# ── 5. Install iterm-watchdog LaunchAgent ────────────────────────────────────
-header "Step 5/7 — installing LaunchAgent at $WATCHDOG_PLIST"
+# ── 5. Build & install the notifier .app bundle ──────────────────────────────
+header "Step 5/8 — building notifier .app for custom notification icon"
+
+# The notifier is a tiny Swift binary inside a .app bundle. We compile
+# it from source at install time so the bundle's icon resource is OURS
+# (notifications show the headsup icon instead of Script Editor's).
+# Build script handles compile + ad-hoc codesign + lsregister.
+
+NOTIFIER_DIR="$HOME/Library/Application Support/headsup"
+NOTIFIER_BUILD="$SCRIPT_DIR/notifier-app/build-notifier.sh"
+
+if [ ! -x "$NOTIFIER_BUILD" ]; then
+    warn "notifier build script missing at $NOTIFIER_BUILD — wait-notifications will fall back to osascript (Script Editor icon)"
+else
+    mkdir -p "$NOTIFIER_DIR"
+    if "$NOTIFIER_BUILD" "$NOTIFIER_DIR" >/dev/null 2>&1; then
+        ok "built $NOTIFIER_DIR/headsup-notifier.app"
+        if [ -f "$SCRIPT_DIR/notifier-app/AppIcon.icns" ]; then
+            ok "  icon bundled"
+        else
+            note "  ${DIM}no icon yet — drop a 1024×1024 PNG at notifier-app/icon-source.png, run ./notifier-app/build-icon.sh, then re-run this setup script${RST}"
+        fi
+        note "  ${DIM}first wait-notification will trigger a one-time macOS permission prompt (\"headsup wants to send notifications\")${RST}"
+    else
+        warn "notifier build failed — wait-notifications will fall back to osascript"
+    fi
+fi
+
+# ── 6. Install iterm-watchdog LaunchAgent ────────────────────────────────────
+header "Step 6/8 — installing LaunchAgent at $WATCHDOG_PLIST"
 
 # The watchdog is the outermost safety net for the iterm hook stack —
 # launchd fires it every 30s, completely independent of Claude Code. On
@@ -257,7 +284,7 @@ else
 fi
 
 # ── 6. Install skills ────────────────────────────────────────────────────────
-header "Step 6/7 — installing skills into $CLAUDE_DIR/skills/"
+header "Step 7/8 — installing skills into $CLAUDE_DIR/skills/"
 
 mkdir -p "$CLAUDE_DIR/skills"
 sinstalled=0; sskipped=0; soverwrote=0
@@ -294,7 +321,7 @@ done
 note "${sinstalled} installed, ${soverwrote} overwritten, ${sskipped} skipped"
 
 # ── 7. Wire hooks into settings.json ─────────────────────────────────────────
-header "Step 7/7 — wiring hooks into $SETTINGS"
+header "Step 8/8 — wiring hooks into $SETTINGS"
 
 # The JSON shape Claude Code expects. Six events; all are load-bearing
 # (see README.md → "How it works" for why).
