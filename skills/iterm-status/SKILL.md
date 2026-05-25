@@ -42,4 +42,4 @@ The diagnostic that *actively exercises* the stack (vs just observing it) is `/i
 - `~/.claude/hooks/.state/` — daemon / watchdog state files
 - `~/.claude/hooks/iterm-status.log` — event + suppression log (when `.debug` is touched)
 
-All under version control at `github.com/wasulajr/lookout`.
+All under version control at `github.com/wasulajr/headsup`.

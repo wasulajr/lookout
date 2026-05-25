@@ -59,4 +59,4 @@ Original tab state is restored on exit (whatever color/attention it was before t
 - `~/.claude/hooks/iterm-resync.sh` — how each color push lands
 - `~/.claude/hooks/iterm-session-cost.py` — the cost helper that gets smoke-tested
 
-All under version control at `github.com/wasulajr/lookout`.
+All under version control at `github.com/wasulajr/headsup`.

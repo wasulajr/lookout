@@ -76,4 +76,4 @@ When you respond (UserPromptSubmit), the state file gets rewritten with a new co
 - `~/.claude/hooks/iterm-notify-waiting.sh` — the actual notifier (called from the watchdog)
 - `~/.claude/hooks/iterm-watchdog.sh` — calls the notifier every 30s
 
-All under version control at `github.com/wasulajr/lookout`.
+All under version control at `github.com/wasulajr/headsup`.

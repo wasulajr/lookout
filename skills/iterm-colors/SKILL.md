@@ -1,6 +1,6 @@
 ---
 name: iterm-colors
-description: Customize the three global tab colors for Claude Code's iTerm2 status hook — idle (fresh session), processing (Claude working), and waiting (Claude needs you). Invoke when the user wants to change any of those three colors ("change waiting color to orange", "idle should be gray", "swap blue for purple while processing"). Edits ~/.claude/hooks/iterm-status.conf, applies the matching color to the current tab immediately, then commits + pushes to wasulajr/lookout. Title/badge customization is a SEPARATE skill (/iterm-label) — don't handle those here.
+description: Customize the three global tab colors for Claude Code's iTerm2 status hook — idle (fresh session), processing (Claude working), and waiting (Claude needs you). Invoke when the user wants to change any of those three colors ("change waiting color to orange", "idle should be gray", "swap blue for purple while processing"). Edits ~/.claude/hooks/iterm-status.conf, applies the matching color to the current tab immediately, then commits + pushes to wasulajr/headsup. Title/badge customization is a SEPARATE skill (/iterm-label) — don't handle those here.
 ---
 
 # iTerm2 Color Customization (global)
@@ -10,7 +10,7 @@ Edits the three state colors in the GLOBAL hook config. All iTerm2 tabs running 
 ## Files involved
 
 - **`~/.claude/hooks/iterm-status.conf`** — global config. Edit this only; do NOT touch `~/.claude/hooks/iterm-status.sh` (the script has defaults that apply when the conf file is missing — that's the safety net).
-- **`~/.claude/`** — git repo (`wasulajr/lookout`, public). After saving, commit + push.
+- **`~/.claude/`** — git repo (`wasulajr/headsup`, public). After saving, commit + push.
 
 ## Configurable surface
 

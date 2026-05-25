@@ -1,4 +1,4 @@
-# lookout — glanceable Claude Code state for iTerm2
+# headsup — glanceable Claude Code state for iTerm2
 
 Twenty tabs deep. You hear the Dock bounce. You glance at the tab bar.
 One tab is orange. That's [Claude Code](https://claude.com/claude-code)
@@ -35,7 +35,7 @@ Plus:
 ## What's in this folder
 
 ```
-lookout/
+headsup/
 ├── README.md             # you are here
 ├── setup.sh              # one-shot installer (run me)
 ├── hooks/
@@ -81,8 +81,8 @@ is missing.
 ## Quick install
 
 ```bash
-git clone https://github.com/wasulajr/lookout.git
-cd lookout
+git clone https://github.com/wasulajr/headsup.git
+cd headsup
 ./setup.sh
 ```
 
@@ -328,7 +328,7 @@ parallel and want each to have a distinguishing color:
 iterm_project_process_color() {
     case "$PWD" in
         */Digadop*)        printf '8a3ffc' ;;  # purple
-        */lookout*)        printf 'ff6b6b' ;;  # coral
+        */headsup*)        printf 'ff6b6b' ;;  # coral
         *)                 printf '' ;;        # empty = use global default
     esac
 }
@@ -511,7 +511,7 @@ shell logic there.
   proprietary extensions. Other terminals need not apply.
 - **Audited or supported**: built by one developer who got tired of
   missing when Claude needed them. Bugs welcome at
-  https://github.com/wasulajr/lookout/issues but there's no SLA and
+  https://github.com/wasulajr/headsup/issues but there's no SLA and
   no roadmap.
 
 ## License

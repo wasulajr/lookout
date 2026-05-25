@@ -39,4 +39,4 @@ It pushes the color through. It does NOT revive Claude Code's automatic hook fir
 - `~/.claude/hooks/iterm2-daemon.py` — Tier 1 daemon, the script writes state for it to pick up
 - `~/.claude/hooks/iterm-status.conf` — color customization (PROCESS_COLOR etc.); the script honors overrides
 
-All four are under version control at `github.com/wasulajr/lookout`.
+All four are under version control at `github.com/wasulajr/headsup`.
