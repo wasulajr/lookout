@@ -9,7 +9,7 @@
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
-    <string>com.wasulajr.headsup</string>
+    <string>com.wasulajr.headsup.notifier</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
@@ -24,8 +24,6 @@
     <string>1</string>
     <key>LSMinimumSystemVersion</key>
     <string>11.0</string>
-    <key>LSUIElement</key>
-    <true/>
     <key>NSHumanReadableCopyright</key>
     <string>MIT License — github.com/wasulajr/headsup</string>
 </dict>

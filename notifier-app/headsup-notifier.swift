@@ -8,13 +8,24 @@
 // notifications get Script Editor's icon. The only way to show OUR icon
 // is to post from inside our own .app bundle via UNUserNotificationCenter.
 //
+// Implementation notes:
+//   - UNUserNotificationCenter requires the calling process to be a
+//     proper NSApplication, not a bare CLI binary, or macOS silently
+//     refuses to even show the authorization prompt. We instantiate
+//     NSApplication.shared and drive the runloop briefly so the
+//     framework sees a real app context.
+//   - LSUIElement is OMITTED from Info.plist so the system treats this
+//     as a regular foreground-eligible app. The binary exits quickly
+//     so there's no lingering Dock icon.
+//   - Bundle is ad-hoc codesigned by build-notifier.sh so macOS persists
+//     the user's Allow/Deny across runs (cdhash identity).
+//
 // Usage:
 //   headsup-notifier <title> <subtitle> <body> [group-id]
 //
 // Exits 0 on success, 1 on bad args, 2 on permission denied.
-// First run prompts: "headsup wants to send notifications. Allow?"
 
-import Foundation
+import Cocoa
 import UserNotifications
 
 let args = CommandLine.arguments
@@ -28,44 +39,68 @@ let subtitle = args[2]
 let body = args[3]
 let groupId = args.count > 4 ? args[4] : "default"
 
-let center = UNUserNotificationCenter.current()
-let semaphore = DispatchSemaphore(value: 0)
-var finalExit: Int32 = 0
+// AppDelegate handles app lifecycle so NSApplication sees us as a
+// proper Cocoa app — required for UNUserNotificationCenter to function.
+class AppDelegate: NSObject, NSApplicationDelegate {
+    var exitCode: Int32 = 0
 
-center.requestAuthorization(options: [.alert, .sound]) { granted, error in
-    guard granted else {
-        FileHandle.standardError.write(Data("notification permission denied\n".utf8))
-        finalExit = 2
-        semaphore.signal()
-        return
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        let center = UNUserNotificationCenter.current()
+        center.requestAuthorization(options: [.alert, .sound]) { granted, error in
+            DispatchQueue.main.async {
+                guard granted else {
+                    FileHandle.standardError.write(Data("notification permission denied\n".utf8))
+                    if let error = error {
+                        FileHandle.standardError.write(Data("  (\(error.localizedDescription))\n".utf8))
+                    }
+                    self.exitCode = 2
+                    NSApp.terminate(nil)
+                    return
+                }
+                self.postNotification()
+            }
+        }
     }
 
-    let content = UNMutableNotificationContent()
-    content.title = title
-    if !subtitle.isEmpty { content.subtitle = subtitle }
-    content.body = body
-    content.sound = .default
-    // threadIdentifier groups notifications in Notification Center so a
-    // newer notification with the same group replaces the older one
-    // (matches the dedup behavior the old terminal-notifier path had).
-    content.threadIdentifier = groupId
+    func postNotification() {
+        let content = UNMutableNotificationContent()
+        content.title = title
+        if !subtitle.isEmpty { content.subtitle = subtitle }
+        content.body = body
+        content.sound = .default
+        // threadIdentifier groups notifications in Notification Center
+        // so a newer notification with the same group replaces the older.
+        content.threadIdentifier = groupId
 
-    let request = UNNotificationRequest(
-        identifier: UUID().uuidString,
-        content: content,
-        trigger: nil
-    )
+        let request = UNNotificationRequest(
+            identifier: UUID().uuidString,
+            content: content,
+            trigger: nil
+        )
 
-    center.add(request) { err in
-        if let err = err {
-            FileHandle.standardError.write(Data("notification post failed: \(err)\n".utf8))
-            finalExit = 3
+        UNUserNotificationCenter.current().add(request) { err in
+            DispatchQueue.main.async {
+                if let err = err {
+                    FileHandle.standardError.write(Data("notification post failed: \(err)\n".utf8))
+                    self.exitCode = 3
+                }
+                NSApp.terminate(nil)
+            }
         }
-        semaphore.signal()
     }
 }
 
-// Authorization callback can take a moment on first run; cap it so a
-// hung permission dialog doesn't keep the watchdog process alive.
-_ = semaphore.wait(timeout: .now() + 10)
-exit(finalExit)
+let app = NSApplication.shared
+// .accessory keeps us out of the Dock and command-tab list while still
+// counting as a foreground app for permission purposes.
+app.setActivationPolicy(.accessory)
+let delegate = AppDelegate()
+app.delegate = delegate
+
+// Safety net: if anything hangs, force-exit after 10s.
+DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
+    NSApp.terminate(nil)
+}
+
+app.run()
+exit(delegate.exitCode)
