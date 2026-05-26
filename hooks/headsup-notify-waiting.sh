@@ -1,10 +1,10 @@
 #!/bin/bash
-# iterm-notify-waiting.sh — fire a macOS notification when a Claude tab
+# headsup-notify-waiting.sh — fire a macOS notification when a Claude tab
 # has been in the orange (waiting) state for longer than THRESHOLD_MIN
 # minutes without the user responding.
 #
 # Called from the launchd watchdog (every 30s). Reads
-# ~/.claude/hooks/iterm-notifications.conf for ENABLED and
+# ~/.claude/hooks/headsup-notifications.conf for ENABLED and
 # THRESHOLD_MIN. Idempotent: tracks per-session `.notified` markers so
 # each wait period notifies at most once.
 #
@@ -22,11 +22,11 @@
 set -u
 
 STATE_DIR="$HOME/.claude/hooks/.state"
-CONFIG="$HOME/.claude/hooks/iterm-notifications.conf"
-LOG_FILE="$HOME/.claude/hooks/iterm-status.log"
+CONFIG="$HOME/.claude/hooks/headsup-notifications.conf"
+LOG_FILE="$HOME/.claude/hooks/headsup-status.log"
 DEBUG_FLAG="$HOME/.claude/hooks/.debug"
 DISABLED_FLAG="$HOME/.claude/hooks/.disabled"
-STATUS_CONFIG="$HOME/.claude/hooks/iterm-status.conf"
+STATUS_CONFIG="$HOME/.claude/hooks/headsup-status.conf"
 
 # Kill switch — same convention as the main hook.
 [ -f "$DISABLED_FLAG" ] && exit 0
@@ -41,7 +41,7 @@ NOTIFICATION_SOUND="Glass"
 [ "$ENABLED" = "1" ] || exit 0
 
 # Need to know which hex = "waiting" to identify orange state files.
-# Default to the documented WAIT_COLOR; honor the user's iterm-status.conf
+# Default to the documented WAIT_COLOR; honor the user's headsup-status.conf
 # override if present.
 WAIT_COLOR="e67e22"
 # shellcheck source=/dev/null
@@ -127,7 +127,7 @@ while IFS= read -r state_file; do
     label=$(session_label "$uuid")
     # Three-slot layout — put the project/badge in the bold title so it's
     # the first thing the user sees:
-    #   title:    <badge>            (e.g., "iterm-config")
+    #   title:    <badge>            (e.g., "headsup")
     #   subtitle: Claude is waiting
     #   body:     Idle for over <N>m
     fire_notification \

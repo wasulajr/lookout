@@ -18,13 +18,13 @@
 #      No retries needed.
 #
 # Colors, title, and badge text are configurable via
-#   ~/.claude/hooks/iterm-status.conf
-# (sourced if present). The /iterm-colors and /iterm-label skills are
+#   ~/.claude/hooks/headsup-status.conf
+# (sourced if present). The /headsup-colors and /headsup-label skills are
 # the friendly editors. Defaults below apply when the conf file is
 # missing.
 #
 # Hook invocation:
-#   ~/.claude/hooks/iterm-status.sh <event>
+#   ~/.claude/hooks/headsup-status.sh <event>
 
 EVENT="$1"
 
@@ -51,7 +51,7 @@ if [ "$EVENT" = "PreToolUse" ] || [ "$EVENT" = "PostToolUse" ]; then
 fi
 
 # Debug log — only writes when ~/.claude/hooks/.debug exists.
-# Tail with `tail -f ~/.claude/hooks/iterm-status.log` to see what's
+# Tail with `tail -f ~/.claude/hooks/headsup-status.log` to see what's
 # firing (or not). Touch ~/.claude/hooks/.debug to enable.
 #
 # Size-based rotation: when the log exceeds LOG_MAX_BYTES, rename to
@@ -59,7 +59,7 @@ fi
 # check per hook invocation so the cost is negligible. We keep one
 # rotation file — enough for "what happened in the recent past" forensics
 # without unbounded growth.
-LOG_FILE="$HOME/.claude/hooks/iterm-status.log"
+LOG_FILE="$HOME/.claude/hooks/headsup-status.log"
 LOG_MAX_BYTES=5242880   # 5 MB
 if [ -f "$LOG_FILE" ]; then
     log_size=$(stat -f%z "$LOG_FILE" 2>/dev/null || stat -c%s "$LOG_FILE" 2>/dev/null || echo 0)
@@ -78,16 +78,16 @@ IDLE_COLOR="ffffff"     # white  — fresh session / idle
 PROCESS_COLOR="3a82f5"  # blue   — Claude is processing
 WAIT_COLOR="ffcc00"     # yellow — Claude is waiting on you
 
-iterm_badge_text() { basename "$PWD"; }
-iterm_title_text() { printf 'Claude · %s' "$1"; }
+headsup_badge_text() { basename "$PWD"; }
+headsup_title_text() { printf 'Claude · %s' "$1"; }
 
-CONFIG_FILE="$HOME/.claude/hooks/iterm-status.conf"
+CONFIG_FILE="$HOME/.claude/hooks/headsup-status.conf"
 # shellcheck source=/dev/null
 [ -f "$CONFIG_FILE" ] && source "$CONFIG_FILE"
 
 if [ -n "$ITERM_SESSION_ID" ]; then
     SESSION_KEY=$(printf '%s' "$ITERM_SESSION_ID" | tr -c '[:alnum:]-' '_')
-    SESSION_CONFIG_FILE="$HOME/.claude/hooks/iterm-status.d/${SESSION_KEY}.conf"
+    SESSION_CONFIG_FILE="$HOME/.claude/hooks/headsup-status.d/${SESSION_KEY}.conf"
     # shellcheck source=/dev/null
     [ -f "$SESSION_CONFIG_FILE" ] && source "$SESSION_CONFIG_FILE"
 fi
@@ -96,16 +96,16 @@ fi
 # conf file. Each gets no args, sees $PWD, returns either a 6-char hex
 # or empty (= no override). Order of precedence: per-session conf >
 # per-project function > global default.
-if declare -f iterm_project_idle_color >/dev/null 2>&1; then
-    override=$(iterm_project_idle_color 2>/dev/null)
+if declare -f headsup_project_idle_color >/dev/null 2>&1; then
+    override=$(headsup_project_idle_color 2>/dev/null)
     [ -n "$override" ] && IDLE_COLOR="$override"
 fi
-if declare -f iterm_project_process_color >/dev/null 2>&1; then
-    override=$(iterm_project_process_color 2>/dev/null)
+if declare -f headsup_project_process_color >/dev/null 2>&1; then
+    override=$(headsup_project_process_color 2>/dev/null)
     [ -n "$override" ] && PROCESS_COLOR="$override"
 fi
-if declare -f iterm_project_wait_color >/dev/null 2>&1; then
-    override=$(iterm_project_wait_color 2>/dev/null)
+if declare -f headsup_project_wait_color >/dev/null 2>&1; then
+    override=$(headsup_project_wait_color 2>/dev/null)
     [ -n "$override" ] && WAIT_COLOR="$override"
 fi
 
@@ -115,12 +115,12 @@ fi
 STATE_DIR="$HOME/.claude/hooks/.state"
 
 # Persist the current badge text to a sidecar on EVERY event (not just
-# SessionStart) so out-of-band callers like iterm-notify-waiting.sh can
+# SessionStart) so out-of-band callers like headsup-notify-waiting.sh can
 # show a friendly project name instead of a raw UUID — and so existing
 # tabs that started before this code existed also pick up a sidecar
 # on their next event. The write is cheap (<50 bytes) and idempotent.
 if [ -n "$ITERM_SESSION_ID" ]; then
-    _badge_for_sidecar=$(iterm_badge_text 2>/dev/null)
+    _badge_for_sidecar=$(headsup_badge_text 2>/dev/null)
     _uuid_for_sidecar="${ITERM_SESSION_ID#*:}"
     if [ -n "$_badge_for_sidecar" ] && [ -n "$_uuid_for_sidecar" ]; then
         mkdir -p "$STATE_DIR" 2>/dev/null
@@ -363,9 +363,9 @@ case "$EVENT" in
     SessionStart)
         clear_waiting_marker
         write_precount 0
-        BADGE=$(iterm_badge_text)
+        BADGE=$(headsup_badge_text)
         BADGE_B64=$(printf '%s' "$BADGE" | base64)
-        TITLE=$(iterm_title_text "$BADGE")
+        TITLE=$(headsup_title_text "$BADGE")
         write_osc "$(printf '\033]1337;SetBadgeFormat=%s\007\033]0;%s\007' "$BADGE_B64" "$TITLE")"
         # (Badge sidecar gets written above for every event; no per-Case
         # logic needed here.)

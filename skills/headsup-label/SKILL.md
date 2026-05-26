@@ -1,6 +1,6 @@
 ---
-name: iterm-label
-description: Set or change the per-iTerm2-session label — both the window/tab title AND the badge (watermark) for THIS iTerm2 pane only. Use when the user wants a custom name for this specific tab ("call this tab 'deploy debugging'", "label this session 'prod work'", "set the badge to 'frontend'"). Title and badge always share the same string in this skill (per Steve's design — banner and watermark should match). Edits ~/.claude/hooks/iterm-status.d/<session>.conf which is LOCAL ONLY (gitignored, not pushed). For changing colors instead, use /iterm-colors.
+name: headsup-label
+description: Set or change the per-iTerm2-session label — both the window/tab title AND the badge (watermark) for THIS iTerm2 pane only. Use when the user wants a custom name for this specific tab ("call this tab 'deploy debugging'", "label this session 'prod work'", "set the badge to 'frontend'"). Title and badge always share the same string in this skill (per Steve's design — banner and watermark should match). Edits ~/.claude/hooks/headsup-status.d/<session>.conf which is LOCAL ONLY (gitignored, not pushed). For changing colors instead, use /headsup-colors.
 ---
 
 # iTerm2 Per-Session Label
@@ -9,34 +9,34 @@ Sets one shared string as both the iTerm2 badge (top-right watermark) and the wi
 
 ## Files involved
 
-- **`~/.claude/hooks/iterm-status.d/<session-key>.conf`** — per-session conf, sourced by the hook script after the global conf. Holds `iterm_badge_text()` and `iterm_title_text()` definitions that return the chosen label.
-- The directory `iterm-status.d/` is gitignored; nothing committed.
+- **`~/.claude/hooks/headsup-status.d/<session-key>.conf`** — per-session conf, sourced by the hook script after the global conf. Holds `headsup_badge_text()` and `headsup_title_text()` definitions that return the chosen label.
+- The directory `headsup-status.d/` is gitignored; nothing committed.
 
 ## Flow
 
 **Prompt-first design.** Do NOT run any Bash commands before you have the label. Reading the current label or looking up the session key first would trigger a permission prompt before the user has even been asked what they want — that's worse UX than skipping the current-label read. If the user wants to know the current label they'll ask.
 
 1. **Get the label.**
-   - If the user passed an argument when invoking the skill (e.g. `/iterm-label deploy debugging`), use that argument verbatim as the label. Skip to step 2.
+   - If the user passed an argument when invoking the skill (e.g. `/headsup-label deploy debugging`), use that argument verbatim as the label. Skip to step 2.
    - Otherwise, **ask the user** what they want to call this tab. One question, one string (title and badge share it). Do this with `AskUserQuestion` or plain text — but before any tool calls.
 
-2. **Run a single Bash command** that does everything: resolves the session key from `ITERM_SESSION_ID` (looked up from the parent `claude` TUI process via `ps eww -p $PPID`), creates `~/.claude/hooks/iterm-status.d/` if missing, writes the per-session conf, walks up `$PPID` to find a real tty, and writes the OSC sequences to apply badge + title immediately. Template:
+2. **Run a single Bash command** that does everything: resolves the session key from `ITERM_SESSION_ID` (looked up from the parent `claude` TUI process via `ps eww -p $PPID`), creates `~/.claude/hooks/headsup-status.d/` if missing, writes the per-session conf, walks up `$PPID` to find a real tty, and writes the OSC sequences to apply badge + title immediately. Template:
 
    ```bash
    LABEL='<user-supplied-label>'   # single-quote; escape any literal ' inside
    SESSION_ID=$(ps eww -p $PPID 2>/dev/null | tr ' ' '\n' | grep '^ITERM_SESSION_ID=' | head -1 | cut -d= -f2-)
    [ -z "$SESSION_ID" ] && { echo "ERROR: ITERM_SESSION_ID not found — are you in iTerm2?"; exit 1; }
    SESSION_KEY=$(printf '%s' "$SESSION_ID" | tr -c '[:alnum:]-' '_')
-   CONF_DIR="$HOME/.claude/hooks/iterm-status.d"
+   CONF_DIR="$HOME/.claude/hooks/headsup-status.d"
    CONF="$CONF_DIR/${SESSION_KEY}.conf"
    mkdir -p "$CONF_DIR"
    cat > "$CONF" <<EOF
    # Per-iTerm2-session override for this pane.
-   # Managed by /iterm-label. Local-only — iterm-status.d/ is gitignored.
+   # Managed by /headsup-label. Local-only — headsup-status.d/ is gitignored.
    # ITERM_SESSION_ID changes across iTerm2 restarts, so this becomes stale.
 
-   iterm_badge_text() { printf '%s' "$LABEL"; }
-   iterm_title_text() { printf '%s' "$LABEL"; }
+   headsup_badge_text() { printf '%s' "$LABEL"; }
+   headsup_title_text() { printf '%s' "$LABEL"; }
    EOF
    # Walk up $PPID until a real tty appears
    pid=$PPID; tty="??"
@@ -51,9 +51,9 @@ Sets one shared string as both the iTerm2 badge (top-right watermark) and the wi
    echo "Wrote $CONF and applied to /dev/$tty"
    ```
 
-   Use `printf '%s' "$LABEL"` (not `echo`) inside the conf so special chars in the label aren't interpreted. Don't commit / push — `iterm-status.d/` is gitignored and per-session ephemeral.
+   Use `printf '%s' "$LABEL"` (not `echo`) inside the conf so special chars in the label aren't interpreted. Don't commit / push — `headsup-status.d/` is gitignored and per-session ephemeral.
 
-3. **Confirm to the user**, 1–2 sentences. "Label set to '<value>'. Visible in the badge now; persists until you restart iTerm2 (then run `/iterm-label` again)."
+3. **Confirm to the user**, 1–2 sentences. "Label set to '<value>'. Visible in the badge now; persists until you restart iTerm2 (then run `/headsup-label` again)."
 
 The title may flicker if the user's iTerm2 profile doesn't have `Allow Title Setting: false` — Claude Code's TUI re-asserts the title on each render. Badge is stable regardless. Mention only if it actually misbehaves.
 
@@ -62,13 +62,13 @@ The title may flicker if the user's iTerm2 profile doesn't have `Allow Title Set
 If the user wants to remove the per-session override and revert to the global default (`Claude · <project>` etc.):
 
 ```bash
-rm "$HOME/.claude/hooks/iterm-status.d/${SESSION_KEY}.conf"
+rm "$HOME/.claude/hooks/headsup-status.d/${SESSION_KEY}.conf"
 ```
 
 Then re-apply the global badge/title by computing them in a subshell that sources only the global conf, and writing the resulting OSC to the parent tty as in step 5.
 
 ## Notes
 
-- This skill is per-session, no commit/push. `/iterm-colors` is the global-and-committed counterpart.
+- This skill is per-session, no commit/push. `/headsup-colors` is the global-and-committed counterpart.
 - If `ITERM_SESSION_ID` is empty, the design fails — abort cleanly with an error telling the user to check they're running Claude Code from inside an iTerm2 pane.
 - Don't write to the global conf from this skill; that would clobber the project-name default everyone else's tabs depend on.

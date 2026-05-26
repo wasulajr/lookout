@@ -10,7 +10,7 @@ CLAUDE_DIR="$HOME/.claude"
 SETTINGS="$CLAUDE_DIR/settings.json"
 VENV="$CLAUDE_DIR/hooks/iterm2-venv"
 LAUNCHAGENTS_DIR="$HOME/Library/LaunchAgents"
-WATCHDOG_LABEL="claude-code.iterm-watchdog"
+WATCHDOG_LABEL="claude-code.headsup-watchdog"
 WATCHDOG_PLIST="$LAUNCHAGENTS_DIR/${WATCHDOG_LABEL}.plist"
 
 if [ -t 1 ]; then
@@ -209,27 +209,27 @@ else
     fi
 fi
 
-# ── 6. Install iterm-watchdog LaunchAgent ────────────────────────────────────
+# ── 6. Install headsup-watchdog LaunchAgent ────────────────────────────────────
 header "Step 6/8 — installing LaunchAgent at $WATCHDOG_PLIST"
 
-# The watchdog is the outermost safety net for the iterm hook stack —
+# The watchdog is the outermost safety net for the headsup hook stack —
 # launchd fires it every 30s, completely independent of Claude Code. On
 # the healthy path it's dirt cheap (a few stats); when the daemon is
 # down it respawns it and fires Tier 2 per-session.
 #
-# Template lives in iterm-config/launchagents/. We substitute __HOME__ →
+# Template lives in headsup/launchagents/. We substitute __HOME__ →
 # $HOME at install time so the same template works for any user.
 
 WATCHDOG_TEMPLATE="$SCRIPT_DIR/launchagents/${WATCHDOG_LABEL}.plist.template"
 if [ ! -f "$WATCHDOG_TEMPLATE" ]; then
     warn "watchdog template missing at $WATCHDOG_TEMPLATE — skipping LaunchAgent install"
-elif [ ! -f "$CLAUDE_DIR/hooks/iterm-watchdog.sh" ]; then
+elif [ ! -f "$CLAUDE_DIR/hooks/headsup-watchdog.sh" ]; then
     # Step 4 should have placed this. If it didn't, the watchdog has nothing
     # to call, so installing the LaunchAgent would just produce errors.
-    warn "iterm-watchdog.sh missing in $CLAUDE_DIR/hooks/ — skipping LaunchAgent install"
+    warn "headsup-watchdog.sh missing in $CLAUDE_DIR/hooks/ — skipping LaunchAgent install"
 else
     mkdir -p "$LAUNCHAGENTS_DIR"
-    RENDERED=$(mktemp -t iterm-watchdog.plist.XXXXXX)
+    RENDERED=$(mktemp -t headsup-watchdog.plist.XXXXXX)
     # macOS sed: use a literal-pipe delimiter so the homedir slashes don't
     # need escaping. __HOME__ → $HOME substitution.
     sed "s|__HOME__|$HOME|g" "$WATCHDOG_TEMPLATE" > "$RENDERED"
@@ -288,7 +288,7 @@ header "Step 7/8 — installing skills into $CLAUDE_DIR/skills/"
 
 mkdir -p "$CLAUDE_DIR/skills"
 sinstalled=0; sskipped=0; soverwrote=0
-for srcdir in "$SCRIPT_DIR/skills/"iterm-*/; do
+for srcdir in "$SCRIPT_DIR/skills/"headsup-*/; do
     [ -d "$srcdir" ] || continue
     name=$(basename "$srcdir")
     dst="$CLAUDE_DIR/skills/$name"
@@ -327,19 +327,19 @@ header "Step 8/8 — wiring hooks into $SETTINGS"
 # (see README.md → "How it works" for why).
 HOOK_WIRING=$(cat <<'JSON'
 {
-  "SessionStart":     [{ "matcher": "", "hooks": [{ "type": "command", "command": "\"$HOME/.claude/hooks/iterm-status.sh\" SessionStart" }] }],
-  "Notification":     [{ "matcher": "", "hooks": [{ "type": "command", "command": "\"$HOME/.claude/hooks/iterm-status.sh\" Notification" }] }],
-  "Stop":             [{ "matcher": "", "hooks": [{ "type": "command", "command": "\"$HOME/.claude/hooks/iterm-status.sh\" Stop" }] }],
-  "UserPromptSubmit": [{ "matcher": "", "hooks": [{ "type": "command", "command": "\"$HOME/.claude/hooks/iterm-status.sh\" UserPromptSubmit" }] }],
-  "PreToolUse":       [{ "matcher": "", "hooks": [{ "type": "command", "command": "\"$HOME/.claude/hooks/iterm-status.sh\" PreToolUse" }] }],
-  "PostToolUse":      [{ "matcher": "", "hooks": [{ "type": "command", "command": "\"$HOME/.claude/hooks/iterm-status.sh\" PostToolUse" }] }]
+  "SessionStart":     [{ "matcher": "", "hooks": [{ "type": "command", "command": "\"$HOME/.claude/hooks/headsup-status.sh\" SessionStart" }] }],
+  "Notification":     [{ "matcher": "", "hooks": [{ "type": "command", "command": "\"$HOME/.claude/hooks/headsup-status.sh\" Notification" }] }],
+  "Stop":             [{ "matcher": "", "hooks": [{ "type": "command", "command": "\"$HOME/.claude/hooks/headsup-status.sh\" Stop" }] }],
+  "UserPromptSubmit": [{ "matcher": "", "hooks": [{ "type": "command", "command": "\"$HOME/.claude/hooks/headsup-status.sh\" UserPromptSubmit" }] }],
+  "PreToolUse":       [{ "matcher": "", "hooks": [{ "type": "command", "command": "\"$HOME/.claude/hooks/headsup-status.sh\" PreToolUse" }] }],
+  "PostToolUse":      [{ "matcher": "", "hooks": [{ "type": "command", "command": "\"$HOME/.claude/hooks/headsup-status.sh\" PostToolUse" }] }]
 }
 JSON
 )
 
 if [ -f "$SETTINGS" ]; then
     # Check if our hooks are already wired
-    if jq -e '.hooks.SessionStart[0].hooks[0].command' "$SETTINGS" 2>/dev/null | grep -q "iterm-status.sh"; then
+    if jq -e '.hooks.SessionStart[0].hooks[0].command' "$SETTINGS" 2>/dev/null | grep -q "headsup-status.sh"; then
         ok "Hooks already wired in $SETTINGS"
     else
         warn "$SETTINGS exists; need to add hook wiring"
@@ -370,12 +370,12 @@ note "  3. Type any prompt. The tab should turn blue while Claude works, then"
 note "     orange when it's waiting for you."
 echo
 note "Customize from any Claude Code session:"
-note "  /iterm-colors         change the global color palette"
-note "  /iterm-label          set this tab's title + badge"
-note "  /iterm-resync-tab     force-resync a drifted tab"
-note "  /iterm-status         passive health snapshot (daemon, sessions, tokens)"
-note "  /iterm-diagnose       active end-to-end test (flashes tab colors)"
-note "  /iterm-notifications  toggle / threshold the 'Claude is waiting' macOS notification"
+note "  /headsup-colors         change the global color palette"
+note "  /headsup-label          set this tab's title + badge"
+note "  /headsup-resync-tab     force-resync a drifted tab"
+note "  /headsup-status         passive health snapshot (daemon, sessions, tokens)"
+note "  /headsup-diagnose       active end-to-end test (flashes tab colors)"
+note "  /headsup-notifications  toggle / threshold the 'Claude is waiting' macOS notification"
 echo
 note "If something's off:"
 note "  touch ~/.claude/hooks/.debug      enable per-event logging"

@@ -1,6 +1,6 @@
 ---
-name: iterm-resync-tab
-description: Force-resync the iTerm2 tab color for a Claude Code session whose hook chain has fallen out of sync. Use when a tab's color is visibly stuck on a stale state (e.g., still orange after the user replied, still white after Claude started processing) — that means Claude Code's automatic PreToolUse/PostToolUse/UserPromptSubmit/etc. events aren't reaching the hook. This skill bypasses the automatic path entirely and writes the desired state directly via `~/.claude/hooks/iterm-resync.sh`, then fires the Tier 2 one-shot Python (and the daemon picks it up too) for triple-redundancy. Two invocation forms — current tab, or any tab by UUID.
+name: headsup-resync-tab
+description: Force-resync the iTerm2 tab color for a Claude Code session whose hook chain has fallen out of sync. Use when a tab's color is visibly stuck on a stale state (e.g., still orange after the user replied, still white after Claude started processing) — that means Claude Code's automatic PreToolUse/PostToolUse/UserPromptSubmit/etc. events aren't reaching the hook. This skill bypasses the automatic path entirely and writes the desired state directly via `~/.claude/hooks/headsup-resync.sh`, then fires the Tier 2 one-shot Python (and the daemon picks it up too) for triple-redundancy. Two invocation forms — current tab, or any tab by UUID.
 ---
 
 # Resync iTerm2 tab color
@@ -9,20 +9,20 @@ Force-applies the current Claude state (color + attention) to an iTerm2 session,
 
 ## Two ways to invoke
 
-- `/iterm-resync-tab` — resync the **current tab** (the one this Claude session is running in). Default for "I just noticed my own tab is out of sync".
-- `/iterm-resync-tab <UUID>` — resync **a specific tab** by its iTerm2 session UUID, regardless of which tab the user is currently in. Default for "tab 8884B62B is stuck orange, fix it from here". UUID can be the bare uuid OR the full `wXtYpZ:UUID` form — both work.
+- `/headsup-resync-tab` — resync the **current tab** (the one this Claude session is running in). Default for "I just noticed my own tab is out of sync".
+- `/headsup-resync-tab <UUID>` — resync **a specific tab** by its iTerm2 session UUID, regardless of which tab the user is currently in. Default for "tab 8884B62B is stuck orange, fix it from here". UUID can be the bare uuid OR the full `wXtYpZ:UUID` form — both work.
 
 ## What to do when invoked
 
 Run the resync script. It does all the actual work — writes the state file, fires Tier 2 (one-shot Python with fresh iTerm2 connection), and the daemon picks it up too:
 
 ```bash
-~/.claude/hooks/iterm-resync.sh [<uuid>]
+~/.claude/hooks/headsup-resync.sh [<uuid>]
 ```
 
 If the user supplied a UUID argument, pass it through. Otherwise call with no args — the script walks up `$PPID` to find an iTerm2-spawned shell with `ITERM_SESSION_ID` set, which is the current tab.
 
-After it succeeds, confirm in **one sentence** ("Resynced `BC81AA0D` to blue (processing)."). Don't explain the three-tier internals unless the user asks — they typed `/iterm-resync-tab` because they wanted the tab fixed, not a tutorial.
+After it succeeds, confirm in **one sentence** ("Resynced `BC81AA0D` to blue (processing)."). Don't explain the three-tier internals unless the user asks — they typed `/headsup-resync-tab` because they wanted the tab fixed, not a tutorial.
 
 ## When the auto-banner protocol runs this for you
 
@@ -34,9 +34,9 @@ It pushes the color through. It does NOT revive Claude Code's automatic hook fir
 
 ## Where the supporting files live
 
-- `~/.claude/hooks/iterm-resync.sh` — the actual implementation
+- `~/.claude/hooks/headsup-resync.sh` — the actual implementation
 - `~/.claude/hooks/iterm2-apply-once.py` — Tier 2 one-shot, invoked by the script
 - `~/.claude/hooks/iterm2-daemon.py` — Tier 1 daemon, the script writes state for it to pick up
-- `~/.claude/hooks/iterm-status.conf` — color customization (PROCESS_COLOR etc.); the script honors overrides
+- `~/.claude/hooks/headsup-status.conf` — color customization (PROCESS_COLOR etc.); the script honors overrides
 
 All four are under version control at `github.com/wasulajr/headsup`.

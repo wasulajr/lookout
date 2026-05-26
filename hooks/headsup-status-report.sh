@@ -1,7 +1,7 @@
 #!/bin/bash
-# /iterm-status — health snapshot for the iterm-config hook stack.
+# /headsup-status — health snapshot for the headsup hook stack.
 #
-# Run from the /iterm-status skill (or directly) to see whether the daemon,
+# Run from the /headsup-status skill (or directly) to see whether the daemon,
 # watchdog, hook chain, and current session are all behaving. Read-only:
 # does NOT modify anything.
 #
@@ -17,13 +17,13 @@ set -u
 STATE_DIR="$HOME/.claude/hooks/.state"
 HEARTBEAT_FILE="$STATE_DIR/.daemon.heartbeat"
 PID_FILE="$STATE_DIR/daemon.pid"
-LOG_FILE="$HOME/.claude/hooks/iterm-status.log"
+LOG_FILE="$HOME/.claude/hooks/headsup-status.log"
 DEBUG_FLAG="$HOME/.claude/hooks/.debug"
 DISABLED_FLAG="$HOME/.claude/hooks/.disabled"
-WATCHDOG_LABEL="claude-code.iterm-watchdog"
-COST_HELPER="$HOME/.claude/hooks/iterm-session-cost.py"
+WATCHDOG_LABEL="claude-code.headsup-watchdog"
+COST_HELPER="$HOME/.claude/hooks/headsup-session-cost.py"
 VENV_PYTHON="$HOME/.claude/hooks/iterm2-venv/bin/python"
-NOTIFICATIONS_CONFIG="$HOME/.claude/hooks/iterm-notifications.conf"
+NOTIFICATIONS_CONFIG="$HOME/.claude/hooks/headsup-notifications.conf"
 
 if [ -t 1 ]; then
     G=$'\033[32m' Y=$'\033[33m' R=$'\033[31m' B=$'\033[34m' DIM=$'\033[2m' RST=$'\033[0m'
@@ -176,7 +176,7 @@ if [ -f "$NOTIFICATIONS_CONFIG" ]; then
     if [ "${_NC_ENABLED:-1}" = "1" ]; then
         ok "enabled — fires after ${_NC_THRESHOLD_MIN:-5}m of waiting"
     else
-        warn "disabled (use /iterm-notifications on to enable)"
+        warn "disabled (use /headsup-notifications on to enable)"
     fi
     if [ -n "${_NC_NOTIFICATION_SOUND:-}" ]; then
         dim "sound: $_NC_NOTIFICATION_SOUND"

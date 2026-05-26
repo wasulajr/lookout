@@ -29,21 +29,21 @@ headsup/
 ├── README.md                # you are here
 ├── setup.sh                 # one-shot installer (run me)
 ├── hooks/
-│   ├── iterm-status.sh             # bash entry point. Claude Code hooks call this.
-│   ├── iterm-status.conf           # color + badge defaults (edit to customize)
+│   ├── headsup-status.sh             # bash entry point. Claude Code hooks call this.
+│   ├── headsup-status.conf           # color + badge defaults (edit to customize)
 │   ├── iterm2-daemon.py            # persistent daemon that talks to iTerm2's Python API
 │   ├── iterm2-apply-once.py        # one-shot fallback when the daemon isn't available
 │   ├── iterm2-set-tab-color.py     # standalone helper for ad-hoc testing
-│   ├── iterm-resync.sh             # force a tab back into sync (used by /iterm-resync-tab)
-│   ├── iterm-watchdog.sh           # outermost safety net (run from LaunchAgent every 30s)
-│   ├── iterm-status-report.sh      # health snapshot script (used by /iterm-status)
-│   ├── iterm-diagnose.sh           # active end-to-end test (used by /iterm-diagnose)
-│   ├── iterm-session-cost.py       # token-usage aggregator for the current session
-│   ├── iterm-notify-waiting.sh     # fires macOS notifications when a tab waits too long
-│   ├── iterm-notifications.sh      # /iterm-notifications skill helper (toggle / threshold)
-│   └── iterm-notifications.conf    # notifier config (enabled / threshold_min / sound)
+│   ├── headsup-resync.sh             # force a tab back into sync (used by /headsup-resync-tab)
+│   ├── headsup-watchdog.sh           # outermost safety net (run from LaunchAgent every 30s)
+│   ├── headsup-status-report.sh      # health snapshot script (used by /headsup-status)
+│   ├── headsup-diagnose.sh           # active end-to-end test (used by /headsup-diagnose)
+│   ├── headsup-session-cost.py       # token-usage aggregator for the current session
+│   ├── headsup-notify-waiting.sh     # fires macOS notifications when a tab waits too long
+│   ├── headsup-notifications.sh      # /headsup-notifications skill helper (toggle / threshold)
+│   └── headsup-notifications.conf    # notifier config (enabled / threshold_min / sound)
 ├── launchagents/
-│   └── claude-code.iterm-watchdog.plist.template  # rendered + installed by setup.sh
+│   └── claude-code.headsup-watchdog.plist.template  # rendered + installed by setup.sh
 ├── notifier-app/
 │   ├── headsup-notifier.swift      # Swift CLI that posts via UNUserNotificationCenter
 │   ├── Info.plist.template         # bundle metadata (com.wasulajr.headsup.notifier)
@@ -52,12 +52,12 @@ headsup/
 │   ├── build-notifier.sh           # compiles, ad-hoc signs, and lsregisters the .app
 │   └── build-icon.sh               # regenerates AppIcon.icns from icon-source.png
 └── skills/
-    ├── iterm-colors/         # /iterm-colors         change the global color palette
-    ├── iterm-label/          # /iterm-label          set this tab's title + badge
-    ├── iterm-resync-tab/     # /iterm-resync-tab     force-resync a drifted tab
-    ├── iterm-status/         # /iterm-status         passive health snapshot
-    ├── iterm-diagnose/       # /iterm-diagnose       active end-to-end test
-    └── iterm-notifications/  # /iterm-notifications  toggle / threshold the wait notification
+    ├── headsup-colors/         # /headsup-colors         change the global color palette
+    ├── headsup-label/          # /headsup-label          set this tab's title + badge
+    ├── headsup-resync-tab/     # /headsup-resync-tab     force-resync a drifted tab
+    ├── headsup-status/         # /headsup-status         passive health snapshot
+    ├── headsup-diagnose/       # /headsup-diagnose       active end-to-end test
+    └── headsup-notifications/  # /headsup-notifications  toggle / threshold the wait notification
 ```
 
 `setup.sh` copies the `hooks/` and `skills/` contents into your `~/.claude/`, builds the notifier `.app` into `~/Library/Application Support/headsup/`, installs the watchdog LaunchAgent into `~/Library/LaunchAgents/`, and wires the events into your `~/.claude/settings.json`.
@@ -88,7 +88,7 @@ cd headsup
 3. Creates a Python venv at `~/.claude/hooks/iterm2-venv/` with the `iterm2` package
 4. Copies the hook scripts to `~/.claude/hooks/` (prompts before overwriting anything that exists and differs; backs up to `.bak`)
 5. Compiles + installs the notifier `.app` to `~/Library/Application Support/headsup/headsup-notifier.app/`. Wait notifications fire from inside the bundle so they carry the headsup icon (see *Notifier .app* below).
-6. Renders the watchdog LaunchAgent template (substituting `$HOME`) into `~/Library/LaunchAgents/claude-code.iterm-watchdog.plist` and loads it with `launchctl`. Fires every 30s as an outermost safety net (see *Self-healing* below).
+6. Renders the watchdog LaunchAgent template (substituting `$HOME`) into `~/Library/LaunchAgents/claude-code.headsup-watchdog.plist` and loads it with `launchctl`. Fires every 30s as an outermost safety net (see *Self-healing* below).
 7. Copies the six skill folders to `~/.claude/skills/`
 8. Merges the hook wiring into `~/.claude/settings.json` (backs up to `.bak` if it already exists)
 
@@ -96,7 +96,7 @@ After the script finishes:
 
 - If iTerm2's Python API was just enabled, **restart iTerm2** (or flip the Settings → General → Magic → Python API toggle off and on) for it to take effect.
 - Open a new iTerm2 tab and run `claude`. The first hook event triggers an iTerm2 permission dialog. Click **"Always Allow"**.
-- The first time a tab sits idle past the notification threshold (or the first time you run `/iterm-notifications test`), macOS shows "headsup wants to send notifications." Click **Allow**. From then on notifications fire silently with the headsup icon attached.
+- The first time a tab sits idle past the notification threshold (or the first time you run `/headsup-notifications test`), macOS shows "headsup wants to send notifications." Click **Allow**. From then on notifications fire silently with the headsup icon attached.
 - Type a prompt. The tab should turn blue while Claude works, then orange when it's waiting for you.
 
 ## Manual install (if you prefer)
@@ -121,7 +121,7 @@ python3 -m venv ~/.claude/hooks/iterm2-venv
 ```bash
 mkdir -p ~/.claude/hooks ~/.claude/skills
 cp hooks/* ~/.claude/hooks/
-cp -r skills/iterm-* ~/.claude/skills/
+cp -r skills/headsup-* ~/.claude/skills/
 chmod +x ~/.claude/hooks/*.sh ~/.claude/hooks/*.py
 ```
 
@@ -138,14 +138,14 @@ This compiles `headsup-notifier.swift` into a `.app` bundle under `~/Library/App
 ```bash
 # Render the template (substitute $HOME) and install
 sed "s|__HOME__|$HOME|g" \
-  launchagents/claude-code.iterm-watchdog.plist.template \
-  > ~/Library/LaunchAgents/claude-code.iterm-watchdog.plist
+  launchagents/claude-code.headsup-watchdog.plist.template \
+  > ~/Library/LaunchAgents/claude-code.headsup-watchdog.plist
 
 # Load it
-launchctl load ~/Library/LaunchAgents/claude-code.iterm-watchdog.plist
+launchctl load ~/Library/LaunchAgents/claude-code.headsup-watchdog.plist
 
 # Confirm
-launchctl list | grep claude-code.iterm-watchdog
+launchctl list | grep claude-code.headsup-watchdog
 ```
 
 The watchdog fires every 30s and is a no-op on the healthy path; see *Self-healing* below for what it does when things go wrong.
@@ -161,12 +161,12 @@ If you cloned the whole repo and ran `setup.sh`, this is already done. If you me
 ```json
 {
   "hooks": {
-    "SessionStart":     [{ "matcher": "", "hooks": [{ "type": "command", "command": "\"$HOME/.claude/hooks/iterm-status.sh\" SessionStart" }] }],
-    "Notification":     [{ "matcher": "", "hooks": [{ "type": "command", "command": "\"$HOME/.claude/hooks/iterm-status.sh\" Notification" }] }],
-    "Stop":             [{ "matcher": "", "hooks": [{ "type": "command", "command": "\"$HOME/.claude/hooks/iterm-status.sh\" Stop" }] }],
-    "UserPromptSubmit": [{ "matcher": "", "hooks": [{ "type": "command", "command": "\"$HOME/.claude/hooks/iterm-status.sh\" UserPromptSubmit" }] }],
-    "PreToolUse":       [{ "matcher": "", "hooks": [{ "type": "command", "command": "\"$HOME/.claude/hooks/iterm-status.sh\" PreToolUse" }] }],
-    "PostToolUse":      [{ "matcher": "", "hooks": [{ "type": "command", "command": "\"$HOME/.claude/hooks/iterm-status.sh\" PostToolUse" }] }]
+    "SessionStart":     [{ "matcher": "", "hooks": [{ "type": "command", "command": "\"$HOME/.claude/hooks/headsup-status.sh\" SessionStart" }] }],
+    "Notification":     [{ "matcher": "", "hooks": [{ "type": "command", "command": "\"$HOME/.claude/hooks/headsup-status.sh\" Notification" }] }],
+    "Stop":             [{ "matcher": "", "hooks": [{ "type": "command", "command": "\"$HOME/.claude/hooks/headsup-status.sh\" Stop" }] }],
+    "UserPromptSubmit": [{ "matcher": "", "hooks": [{ "type": "command", "command": "\"$HOME/.claude/hooks/headsup-status.sh\" UserPromptSubmit" }] }],
+    "PreToolUse":       [{ "matcher": "", "hooks": [{ "type": "command", "command": "\"$HOME/.claude/hooks/headsup-status.sh\" PreToolUse" }] }],
+    "PostToolUse":      [{ "matcher": "", "hooks": [{ "type": "command", "command": "\"$HOME/.claude/hooks/headsup-status.sh\" PostToolUse" }] }]
   }
 }
 ```
@@ -181,7 +181,7 @@ Open a new iTerm2 tab, run `claude`, type something. The tab should turn blue wh
 
 ### Event → color mapping
 
-The bash script `iterm-status.sh` runs on every Claude Code hook event and decides what color the tab should be:
+The bash script `headsup-status.sh` runs on every Claude Code hook event and decides what color the tab should be:
 
 | Claude Code event   | Tab color | Dock attention | Why                                                                                |
 |---------------------|-----------|----------------|------------------------------------------------------------------------------------|
@@ -203,7 +203,7 @@ There are also synthetic events the script derives itself:
 
 A one-shot Python invocation per event was too slow (~440 ms cold-start for the `iterm2` package + websocket handshake to iTerm2). So the system splits in two:
 
-1. **`iterm-status.sh`** (bash). Fires on every hook event. Writes the desired `<color> <attention>` to a tiny state file (`hooks/.state/<session-uuid>.state`), then ensures the daemon is alive (PID file lock at `hooks/.state/daemon.pid`).
+1. **`headsup-status.sh`** (bash). Fires on every hook event. Writes the desired `<color> <attention>` to a tiny state file (`hooks/.state/<session-uuid>.state`), then ensures the daemon is alive (PID file lock at `hooks/.state/daemon.pid`).
 2. **`iterm2-daemon.py`** (Python, long-running). Holds one open websocket to iTerm2's API for the whole machine. Polls the state files every 30 ms and injects OSC byte sequences directly into iTerm2 when they change. Bypasses the pty entirely, so the Claude Code TUI's concurrent writes can't tear the bytes.
 
 The daemon auto-evicts itself after an hour of inactivity. It also checks on every poll that it still owns the PID file. If it doesn't (e.g. someone wiped `.state/`), it exits cleanly so the next event spawns a fresh one.
@@ -215,7 +215,7 @@ The daemon's websocket to iTerm2 can die quietly. The Python process stays alive
 1. **Active liveness probe.** Before every heartbeat write, the daemon does a round-trip API call (`app.async_refresh`). If it fails, the daemon writes a `DEAD` heartbeat and exits; the bash hook respawns it on the next event.
 2. **Apply-error classification.** Websocket-class exceptions during `apply_state` trigger the same DEAD-exit. Non-WS errors just log.
 3. **Per-daemon reconciliation sweep.** Every ~7s, the daemon re-asserts the desired state for every session it knows about. Idempotent OSC injection; catches drift from any cause.
-4. **`launchd` watchdog.** `iterm-watchdog.sh` runs every 30s, completely independent of Claude Code. Dirt cheap on the healthy path (a few `stat`s + a heartbeat read). When the daemon is missing or `DEAD`, the watchdog respawns it and fires Tier 2 per-session as defense in depth. Logs to `~/.claude/hooks/.state/watchdog.std{out,err}`.
+4. **`launchd` watchdog.** `headsup-watchdog.sh` runs every 30s, completely independent of Claude Code. Dirt cheap on the healthy path (a few `stat`s + a heartbeat read). When the daemon is missing or `DEAD`, the watchdog respawns it and fires Tier 2 per-session as defense in depth. Logs to `~/.claude/hooks/.state/watchdog.std{out,err}`.
 
 The watchdog is the layer that keeps things working through a wedged Claude Code process, a long-stuck tool call, or any other scenario where hook events dry up entirely. None of layers 1-3 can fire if nothing in the session is alive.
 
@@ -229,7 +229,7 @@ The bash hook maintains a per-session in-flight-tool counter (`<uuid>.precount`)
 - `Notification` / `Stop` / `PreToolUseWaitForUser` set the waiting marker but DO NOT touch the counter.
 - `PostToolUse` suppresses itself only when **both** the waiting marker is set AND the in-flight counter is 0. That combination uniquely identifies a stray end-of-turn delivery.
 
-This preserves the legitimate "Notification mid-tool" case (e.g., tool permission prompt). The in-flight counter stays at 1 across the Notification, so the post-approval `PostToolUse` correctly flips back to blue. Suppressions are logged when `.debug` is touched; `/iterm-status` summarizes the daily count.
+This preserves the legitimate "Notification mid-tool" case (e.g., tool permission prompt). The in-flight counter stays at 1 across the Notification, so the post-approval `PostToolUse` correctly flips back to blue. Suppressions are logged when `.debug` is touched; `/headsup-status` summarizes the daily count.
 
 ### Notifier .app
 
@@ -249,18 +249,18 @@ iTerm2's "needs attention" state visually overrides the tab color. If a `Notific
 
 The tab title (`Claude · <project>`) and badge (the watermark) are written once via OSC 1337 directly to the parent tty at `SessionStart`. They don't flow through the daemon. They're single-fire, and tty writes are reliable for one-shots.
 
-`iterm-status.sh` walks the parent process tree (`ps -o tty=`) to find a writable tty, because hook subprocesses don't inherit a controlling terminal (`/dev/tty` fails with "Device not configured").
+`headsup-status.sh` walks the parent process tree (`ps -o tty=`) to find a writable tty, because hook subprocesses don't inherit a controlling terminal (`/dev/tty` fails with "Device not configured").
 
 ### Housekeeping
 
-- **Log rotation.** When `iterm-status.log` exceeds 5 MB the bash hook moves it to `iterm-status.log.1` on the next invocation. One rotation kept; no unbounded growth.
+- **Log rotation.** When `headsup-status.log` exceeds 5 MB the bash hook moves it to `headsup-status.log.1` on the next invocation. One rotation kept; no unbounded growth.
 - **Stale state-file GC.** Every 5 min the daemon sweeps `.state` files whose UUID is no longer a live iTerm2 session AND whose mtime is > 24h old, dropping the file plus its `.waiting` / `.precount` sidecars. The age floor prevents deleting a state file for a tab that's briefly invisible (cold-starting, hidden window).
 
 ## Six skills you can run from any Claude Code session
 
-### `/iterm-colors`: paint your tabs whatever you want
+### `/headsup-colors`: paint your tabs whatever you want
 
-Don't like blue. Colorblind colleague. Want to swap the orange for hot pink. Run `/iterm-colors`, pick which state (idle / working / waiting), give it a hex. The skill writes the new value to `hooks/iterm-status.conf`, applies it to your current tab instantly, and, if you're working in your own fork, commits + pushes the change so your other machines pick it up next pull.
+Don't like blue. Colorblind colleague. Want to swap the orange for hot pink. Run `/headsup-colors`, pick which state (idle / working / waiting), give it a hex. The skill writes the new value to `hooks/headsup-status.conf`, applies it to your current tab instantly, and, if you're working in your own fork, commits + pushes the change so your other machines pick it up next pull.
 
 Defaults if you're curious:
 
@@ -272,10 +272,10 @@ WAIT_COLOR="e67e22"     # orange
 
 #### Per-project color overrides
 
-The global palette can be overridden per `$PWD` via optional functions in `iterm-status.conf`. Useful when you have many projects open in parallel and want each to have a distinguishing color:
+The global palette can be overridden per `$PWD` via optional functions in `headsup-status.conf`. Useful when you have many projects open in parallel and want each to have a distinguishing color:
 
 ```bash
-iterm_project_process_color() {
+headsup_project_process_color() {
     case "$PWD" in
         */Digadop*)        printf '8a3ffc' ;;  # purple
         */headsup*)        printf 'ff6b6b' ;;  # coral
@@ -284,19 +284,19 @@ iterm_project_process_color() {
 }
 ```
 
-`iterm_project_wait_color` and `iterm_project_idle_color` work the same way. Functions get no args, see `$PWD`, return a 6-char hex (no leading `#`) or empty for "no override." First match wins; uses macOS-bash-3.2-friendly syntax (no associative arrays).
+`headsup_project_wait_color` and `headsup_project_idle_color` work the same way. Functions get no args, see `$PWD`, return a 6-char hex (no leading `#`) or empty for "no override." First match wins; uses macOS-bash-3.2-friendly syntax (no associative arrays).
 
-### `/iterm-label`: name this tab anything
+### `/headsup-label`: name this tab anything
 
-Default badge is the basename of your `$PWD`. Override it for THIS iTerm2 pane only. Useful when you've got three tabs all working inside the same `my-project/` folder and you can't tell "deploy debugging" from "frontend refactor" from "prod incident" from the tab bar alone. Run `/iterm-label`, give it a string, the badge + tab title both change.
+Default badge is the basename of your `$PWD`. Override it for THIS iTerm2 pane only. Useful when you've got three tabs all working inside the same `my-project/` folder and you can't tell "deploy debugging" from "frontend refactor" from "prod incident" from the tab bar alone. Run `/headsup-label`, give it a string, the badge + tab title both change.
 
 Local-only (gitignored), keyed to `ITERM_SESSION_ID`. Re-run after iTerm2 restart since the IDs change.
 
-### `/iterm-resync-tab`: fix a tab that got stuck
+### `/headsup-resync-tab`: fix a tab that got stuck
 
 Every now and then Claude Code's hook chain drops an event and a tab ends up stuck on the wrong color. Still orange minutes after you replied, still white minutes after Claude started. The whole point of the system breaks down right when you need it.
 
-`/iterm-resync-tab` bypasses the normal hook path entirely and force-writes the desired state through **all three independent tiers in parallel** so something gets through:
+`/headsup-resync-tab` bypasses the normal hook path entirely and force-writes the desired state through **all three independent tiers in parallel** so something gets through:
 
 1. State file write → daemon poll picks it up next tick
 2. Fresh one-shot Python invocation hits iTerm2's API directly
@@ -304,7 +304,7 @@ Every now and then Claude Code's hook chain drops an event and a tab ends up stu
 
 You shouldn't need it often, but you'll be glad it exists the day you do.
 
-### `/iterm-status`: passive health snapshot
+### `/headsup-status`: passive health snapshot
 
 One command, read-only. Shows daemon PID + heartbeat status, watchdog LaunchAgent state, every session's current color and in-flight tool count, the count of stray `PostToolUse` events suppressed today, and token usage for the current `$PWD`'s Claude Code session.
 
@@ -312,26 +312,26 @@ Use when you suspect something's off but you don't want to actively poke the sta
 
 The token usage section sums `message.usage` across every assistant entry in the latest session JSONL for `$PWD`. No USD figure; pricing changes and the table would rot, so raw tokens are the durable signal.
 
-### `/iterm-diagnose`: active end-to-end test
+### `/headsup-diagnose`: active end-to-end test
 
-Where `/iterm-status` observes, `/iterm-diagnose` exercises. Flashes white → blue → orange on the current tab over ~3s, verifying each color both writes to the state file AND lands a "daemon applied" log entry within 2s. Restores the original color on exit. Useful right after installing/upgrading the stack to confirm everything end to end.
+Where `/headsup-status` observes, `/headsup-diagnose` exercises. Flashes white → blue → orange on the current tab over ~3s, verifying each color both writes to the state file AND lands a "daemon applied" log entry within 2s. Restores the original color on exit. Useful right after installing/upgrading the stack to confirm everything end to end.
 
-`/iterm-diagnose --restart` adds a daemon-respawn test: kills the daemon and waits up to 35s for the watchdog to bring it back. Slower but exercises the launchd safety net.
+`/headsup-diagnose --restart` adds a daemon-respawn test: kills the daemon and waits up to 35s for the watchdog to bring it back. Slower but exercises the launchd safety net.
 
 Exit code is 0 on all-pass, 1 on any fail. Scriptable for CI-style checks if you want to gate something on stack health.
 
-### `/iterm-notifications`: macOS notification when Claude waits too long
+### `/headsup-notifications`: macOS notification when Claude waits too long
 
 The tab going orange and the dock bouncing are great when you're at the computer. They're useless when you're not. The launchd watchdog already runs every 30 seconds; this skill turns on a sweep inside that watchdog that fires a real **macOS notification** ("Claude needs you") when a tab has been waiting longer than a configurable threshold.
 
 ```bash
-/iterm-notifications              # show current state
-/iterm-notifications on           # enable
-/iterm-notifications off          # disable
-/iterm-notifications 10           # set threshold to 10 minutes
-/iterm-notifications 10 on        # set + enable
-/iterm-notifications test         # fire a test notification now
-/iterm-notifications sound Ping   # change the sound (or `sound none` to silence)
+/headsup-notifications              # show current state
+/headsup-notifications on           # enable
+/headsup-notifications off          # disable
+/headsup-notifications 10           # set threshold to 10 minutes
+/headsup-notifications 10 on        # set + enable
+/headsup-notifications test         # fire a test notification now
+/headsup-notifications sound Ping   # change the sound (or `sound none` to silence)
 ```
 
 Defaults: enabled, 5-minute threshold, `Glass` sound. Each wait period notifies at most once. If you reply and Claude waits again, the next period gets its own notification. Multiple waiting tabs each get their own notification (no batching).
@@ -340,21 +340,21 @@ Notifications fire from the bundled notifier `.app` and carry the headsup icon. 
 
 ## Troubleshooting
 
-### First: run `/iterm-status` and `/iterm-diagnose`
+### First: run `/headsup-status` and `/headsup-diagnose`
 
-`/iterm-status` shows whether each layer is reporting healthy (passive, read-only). `/iterm-diagnose` actively pushes the three colors through the stack and reports pass/fail per step. Most of the below items are faster to confirm by running those two skills than by reading further.
+`/headsup-status` shows whether each layer is reporting healthy (passive, read-only). `/headsup-diagnose` actively pushes the three colors through the stack and reports pass/fail per step. Most of the below items are faster to confirm by running those two skills than by reading further.
 
 ### "Tab color isn't changing at all"
 
-1. `/iterm-diagnose`. If step 5-7 fails, the daemon's API connection is dead or absent. Check `~/.claude/hooks/.state/daemon.stderr`.
+1. `/headsup-diagnose`. If step 5-7 fails, the daemon's API connection is dead or absent. Check `~/.claude/hooks/.state/daemon.stderr`.
 2. Confirm the daemon is alive: `pgrep -f iterm2-daemon.py`. If nothing, fire any Claude Code event and re-check (the bash hook spawns the daemon on demand). The launchd watchdog should also respawn it within 30s.
 3. Check the venv exists: `ls ~/.claude/hooks/iterm2-venv/bin/python`.
-4. Enable debug logging: `touch ~/.claude/hooks/.debug`. Tail `~/.claude/hooks/iterm-status.log` while triggering events. Correlate `sh fire event=X` lines with `daemon applied …` lines.
+4. Enable debug logging: `touch ~/.claude/hooks/.debug`. Tail `~/.claude/hooks/headsup-status.log` while triggering events. Correlate `sh fire event=X` lines with `daemon applied …` lines.
 5. Confirm the Python API is enabled in iTerm2 (Settings → General → Magic → "Python API"). The first connection requires manual approval.
 
 ### "Tab stuck in attention mode (orange but should be blue)"
 
-This is the load-bearing pairing issue documented above. Run `/iterm-resync-tab`. It sends `RequestAttention=no` along with the correct color. If a specific event consistently leaves you stuck, contribute the fix to `iterm-status.sh`'s event handlers.
+This is the load-bearing pairing issue documented above. Run `/headsup-resync-tab`. It sends `RequestAttention=no` along with the correct color. If a specific event consistently leaves you stuck, contribute the fix to `headsup-status.sh`'s event handlers.
 
 ### "Notifications fire but show the wrong icon (or no icon)"
 
@@ -365,7 +365,7 @@ Most likely the notifier `.app` wasn't built. Re-run `setup.sh` and check the *S
 
 ### "Skill is doing the wrong thing"
 
-Each skill's `SKILL.md` is its full specification. Read it under `skills/iterm-*/SKILL.md`. They're short.
+Each skill's `SKILL.md` is its full specification. Read it under `skills/headsup-*/SKILL.md`. They're short.
 
 ### "I want to turn the whole thing off temporarily"
 
@@ -373,21 +373,21 @@ Each skill's `SKILL.md` is its full specification. Read it under `skills/iterm-*
 touch ~/.claude/hooks/.disabled
 ```
 
-Both the bash hook AND the launchd watchdog check for this file on every run and no-op if present. Remove it to re-enable. (This doesn't kill an already-running daemon; you can `pkill -f iterm2-daemon.py` if you want it gone immediately. To stop the watchdog entirely: `launchctl unload ~/Library/LaunchAgents/claude-code.iterm-watchdog.plist`.)
+Both the bash hook AND the launchd watchdog check for this file on every run and no-op if present. Remove it to re-enable. (This doesn't kill an already-running daemon; you can `pkill -f iterm2-daemon.py` if you want it gone immediately. To stop the watchdog entirely: `launchctl unload ~/Library/LaunchAgents/claude-code.headsup-watchdog.plist`.)
 
 ### "Want to see what the watchdog is doing"
 
-`touch ~/.claude/hooks/.debug` enables logging for the bash hook, the daemon, AND the watchdog. All three write to `~/.claude/hooks/iterm-status.log`. The watchdog also writes any non-empty stdout/stderr to `~/.claude/hooks/.state/watchdog.std{out,err}` regardless of the debug flag (LaunchAgent captures, which is sometimes the only signal you get when launchd itself is refusing to run the script).
+`touch ~/.claude/hooks/.debug` enables logging for the bash hook, the daemon, AND the watchdog. All three write to `~/.claude/hooks/headsup-status.log`. The watchdog also writes any non-empty stdout/stderr to `~/.claude/hooks/.state/watchdog.std{out,err}` regardless of the debug flag (LaunchAgent captures, which is sometimes the only signal you get when launchd itself is refusing to run the script).
 
 ### "I want to extend it"
 
 To add a new state (e.g. red tab on destructive `PreToolUse`):
 
-1. Add the state-deriving branch to `iterm-status.sh`.
+1. Add the state-deriving branch to `headsup-status.sh`.
 2. Use `set_tab_color "<hex>"` to write the state file.
 3. The daemon will pick it up via the state-file format; no daemon changes needed.
 
-For new badge/title behavior, edit `iterm_badge_text()` / `iterm_title_text()` in `hooks/iterm-status.conf`. Both are bash functions and you can put any shell logic there.
+For new badge/title behavior, edit `headsup_badge_text()` / `headsup_title_text()` in `hooks/headsup-status.conf`. Both are bash functions and you can put any shell logic there.
 
 ## What this isn't
 

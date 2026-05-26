@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Tier 2 fallback: per-event one-shot tab-color application.
 
-The bash hook (`iterm-status.sh`) spawns this only when the persistent
+The bash hook (`headsup-status.sh`) spawns this only when the persistent
 daemon's heartbeat is stale (missing, > 1s old, or status != OK) —
 meaning the daemon is dead, stuck, or its iTerm2 API connection has
 gone bad. We connect fresh to iTerm2, find the session by UUID, inject
@@ -37,7 +37,7 @@ import sys
 import iterm2
 
 
-LOG_PATH = os.path.expanduser("~/.claude/hooks/iterm-status.log")
+LOG_PATH = os.path.expanduser("~/.claude/hooks/headsup-status.log")
 DEBUG_FLAG = os.path.expanduser("~/.claude/hooks/.debug")
 
 # Retry budget for the session-not-found case. The first call to

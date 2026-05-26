@@ -2,7 +2,7 @@
 """Persistent iTerm2 tab-color daemon for Claude Code hooks.
 
 One daemon serves ALL iTerm2 sessions on this machine. The bash hook
-~/.claude/hooks/iterm-status.sh writes a per-session state file to
+~/.claude/hooks/headsup-status.sh writes a per-session state file to
 ~/.claude/hooks/.state/<session-uuid>.state in the form:
 
     <6-char-hex>\\n             # color only (attention defaults to "no")
@@ -62,7 +62,7 @@ import iterm2
 STATE_DIR = Path(os.path.expanduser("~/.claude/hooks/.state"))
 PID_FILE = STATE_DIR / "daemon.pid"
 HEARTBEAT_FILE = STATE_DIR / ".daemon.heartbeat"
-LOG_FILE = Path(os.path.expanduser("~/.claude/hooks/iterm-status.log"))
+LOG_FILE = Path(os.path.expanduser("~/.claude/hooks/headsup-status.log"))
 DEBUG_FLAG = Path(os.path.expanduser("~/.claude/hooks/.debug"))
 POLL_INTERVAL = 0.03           # 30ms
 HEARTBEAT_INTERVAL = 0.2       # 200ms — bash hook treats heartbeat > 1s old as stale

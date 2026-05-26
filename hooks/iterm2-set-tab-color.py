@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Set the current iTerm2 session's tab color via the iTerm2 Python API.
 
-Invoked by ~/.claude/hooks/iterm-status.sh. Bypasses the pty entirely:
+Invoked by ~/.claude/hooks/headsup-status.sh. Bypasses the pty entirely:
 sends the SetColors=tab=... OSC sequence directly into iTerm2's parser
 for this session, so the Claude Code TUI's concurrent writes on the
 same tty can't tear or drop it.
@@ -19,7 +19,7 @@ import sys
 import iterm2
 
 
-LOG_PATH = os.path.expanduser("~/.claude/hooks/iterm-status.log")
+LOG_PATH = os.path.expanduser("~/.claude/hooks/headsup-status.log")
 DEBUG_FLAG = os.path.expanduser("~/.claude/hooks/.debug")
 
 

@@ -1,23 +1,23 @@
 #!/bin/bash
-# iterm-notifications.sh — manage the wait-notifier config.
+# headsup-notifications.sh — manage the wait-notifier config.
 #
-# Invoked by the /iterm-notifications skill. Edits
-# ~/.claude/hooks/iterm-notifications.conf in place and prints the
+# Invoked by the /headsup-notifications skill. Edits
+# ~/.claude/hooks/headsup-notifications.conf in place and prints the
 # resulting state.
 #
 # Usage:
-#   iterm-notifications.sh                — show current state
-#   iterm-notifications.sh on             — enable notifications
-#   iterm-notifications.sh off            — disable notifications
-#   iterm-notifications.sh <N>            — set THRESHOLD_MIN to N
-#   iterm-notifications.sh <N> on|off     — set threshold AND toggle
-#   iterm-notifications.sh test           — fire a test notification now
-#   iterm-notifications.sh sound <name>   — set NOTIFICATION_SOUND
-#   iterm-notifications.sh sound none     — silence
+#   headsup-notifications.sh                — show current state
+#   headsup-notifications.sh on             — enable notifications
+#   headsup-notifications.sh off            — disable notifications
+#   headsup-notifications.sh <N>            — set THRESHOLD_MIN to N
+#   headsup-notifications.sh <N> on|off     — set threshold AND toggle
+#   headsup-notifications.sh test           — fire a test notification now
+#   headsup-notifications.sh sound <name>   — set NOTIFICATION_SOUND
+#   headsup-notifications.sh sound none     — silence
 
 set -u
 
-CONFIG="$HOME/.claude/hooks/iterm-notifications.conf"
+CONFIG="$HOME/.claude/hooks/headsup-notifications.conf"
 
 # Defaults if conf missing.
 ENABLED=1
@@ -37,9 +37,9 @@ fi
 
 write_conf() {
     cat > "$CONFIG" <<EOF
-# iTerm-notifications config — sourced by iterm-notify-waiting.sh.
+# iTerm-notifications config — sourced by headsup-notify-waiting.sh.
 #
-# Edit via /iterm-notifications skill (recommended) or by hand. The
+# Edit via /headsup-notifications skill (recommended) or by hand. The
 # launchd watchdog picks up changes on its next run (within 30s) — no
 # restart needed.
 
@@ -112,7 +112,7 @@ fire_test() {
         local icon
         icon=$(resolve_claude_icon)
         [ -n "$icon" ] && args+=(-appIcon "$icon")
-        args+=(-group "iterm-notify-test-$uuid")
+        args+=(-group "headsup-notify-test-$uuid")
         if terminal-notifier "${args[@]}" >/dev/null 2>&1; then
             printf '  %s✓%s test notification fired via terminal-notifier' "$G" "$RST"
             [ -n "$icon" ] && printf ' (Claude icon)'
@@ -190,13 +190,13 @@ case "${1:-}" in
   unknown command: $1
 
   usage:
-    iterm-notifications.sh                — show current state
-    iterm-notifications.sh on             — enable
-    iterm-notifications.sh off            — disable
-    iterm-notifications.sh <N>            — set threshold to N minutes
-    iterm-notifications.sh <N> on|off     — set threshold + toggle
-    iterm-notifications.sh test           — fire a test notification
-    iterm-notifications.sh sound <name>   — set sound (or "none")
+    headsup-notifications.sh                — show current state
+    headsup-notifications.sh on             — enable
+    headsup-notifications.sh off            — disable
+    headsup-notifications.sh <N>            — set threshold to N minutes
+    headsup-notifications.sh <N> on|off     — set threshold + toggle
+    headsup-notifications.sh test           — fire a test notification
+    headsup-notifications.sh sound <name>   — set sound (or "none")
 EOF
         exit 2
         ;;

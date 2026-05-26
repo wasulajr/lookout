@@ -37,7 +37,7 @@ PID_FILE="$STATE_DIR/daemon.pid"
 VENV_PYTHON="$HOME/.claude/hooks/iterm2-venv/bin/python"
 DAEMON_SCRIPT="$HOME/.claude/hooks/iterm2-daemon.py"
 ONESHOT_SCRIPT="$HOME/.claude/hooks/iterm2-apply-once.py"
-LOG_FILE="$HOME/.claude/hooks/iterm-status.log"
+LOG_FILE="$HOME/.claude/hooks/headsup-status.log"
 
 # Kill switch — same convention as the hook itself.
 [ -f "$HOME/.claude/hooks/.disabled" ] && exit 0
@@ -79,8 +79,8 @@ if [ "$daemon_healthy" = "1" ]; then
     # It's cheap (a few stats + at most a `find -mmin`) and produces zero
     # output when no notifications are due, so it doesn't matter that we
     # take the "nothing to do" path here.
-    [ -x "$HOME/.claude/hooks/iterm-notify-waiting.sh" ] && \
-        "$HOME/.claude/hooks/iterm-notify-waiting.sh" 2>/dev/null || true
+    [ -x "$HOME/.claude/hooks/headsup-notify-waiting.sh" ] && \
+        "$HOME/.claude/hooks/headsup-notify-waiting.sh" 2>/dev/null || true
     exit 0
 fi
 
@@ -118,7 +118,7 @@ fi
 # Fires macOS notifications for any tab that's been waiting > THRESHOLD_MIN.
 # Always runs (independent of daemon health) — even if the daemon is down,
 # the user still wants to know Claude is waiting on them.
-[ -x "$HOME/.claude/hooks/iterm-notify-waiting.sh" ] && \
-    "$HOME/.claude/hooks/iterm-notify-waiting.sh" 2>/dev/null || true
+[ -x "$HOME/.claude/hooks/headsup-notify-waiting.sh" ] && \
+    "$HOME/.claude/hooks/headsup-notify-waiting.sh" 2>/dev/null || true
 
 exit 0

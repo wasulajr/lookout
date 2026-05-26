@@ -1,5 +1,5 @@
 #!/bin/bash
-# /iterm-diagnose — active end-to-end test of the iterm-config stack.
+# /headsup-diagnose — active end-to-end test of the headsup stack.
 #
 # Flashes the three colors (idle → processing → waiting) on the current
 # tab to confirm the bash hook + daemon + Tier 2 + OSC pipeline actually
@@ -10,9 +10,9 @@
 # original state is restored at the end.
 #
 # Usage:
-#   iterm-diagnose.sh                — color-flash test only (~3s)
-#   iterm-diagnose.sh --restart      — also kill daemon + verify respawn
-#   iterm-diagnose.sh --quiet        — suppress progress output
+#   headsup-diagnose.sh                — color-flash test only (~3s)
+#   headsup-diagnose.sh --restart      — also kill daemon + verify respawn
+#   headsup-diagnose.sh --quiet        — suppress progress output
 #
 # Exit code: 0 on all-pass, 1 on any fail.
 
@@ -21,13 +21,13 @@ set -u
 STATE_DIR="$HOME/.claude/hooks/.state"
 HEARTBEAT_FILE="$STATE_DIR/.daemon.heartbeat"
 PID_FILE="$STATE_DIR/daemon.pid"
-LOG_FILE="$HOME/.claude/hooks/iterm-status.log"
+LOG_FILE="$HOME/.claude/hooks/headsup-status.log"
 DEBUG_FLAG="$HOME/.claude/hooks/.debug"
-WATCHDOG_LABEL="claude-code.iterm-watchdog"
+WATCHDOG_LABEL="claude-code.headsup-watchdog"
 VENV_PYTHON="$HOME/.claude/hooks/iterm2-venv/bin/python"
 DAEMON_SCRIPT="$HOME/.claude/hooks/iterm2-daemon.py"
-RESYNC="$HOME/.claude/hooks/iterm-resync.sh"
-COST_HELPER="$HOME/.claude/hooks/iterm-session-cost.py"
+RESYNC="$HOME/.claude/hooks/headsup-resync.sh"
+COST_HELPER="$HOME/.claude/hooks/headsup-session-cost.py"
 
 INCLUDE_DAEMON_RESTART=0
 QUIET=0
@@ -64,7 +64,7 @@ warn()  { [ "$QUIET" = "0" ] && printf '  %s!%s %s\n' "$Y" "$RST" "$*"; }
 dim()   { [ "$QUIET" = "0" ] && printf '    %s%s%s\n' "$DIM" "$*" "$RST"; }
 
 # ── Resolve session UUID ──────────────────────────────────────────────────
-# Walk PPID like iterm-resync.sh does — the hook script's env doesn't
+# Walk PPID like headsup-resync.sh does — the hook script's env doesn't
 # include ITERM_SESSION_ID directly; it lives on an iTerm-spawned ancestor.
 walk_ppid_for_iterm_session() {
     local pid="$PPID" candidate
@@ -160,9 +160,9 @@ fi
 step "Step 4: cost helper"
 if [ -f "$COST_HELPER" ] && [ -x "$VENV_PYTHON" ]; then
     if "$VENV_PYTHON" "$COST_HELPER" --cwd "$PWD" --format json >/dev/null 2>&1; then
-        pass "iterm-session-cost.py executes cleanly"
+        pass "headsup-session-cost.py executes cleanly"
     else
-        fail "iterm-session-cost.py exited non-zero"
+        fail "headsup-session-cost.py exited non-zero"
     fi
 else
     warn "cost helper not installed; skipping"
@@ -194,7 +194,7 @@ verify_apply() {
 if [ -n "$UUID" ] && [ -x "$RESYNC" ]; then
     # Read colors from conf (or defaults) so we test what's actually configured
     IDLE_COLOR="ffffff"; PROCESS_COLOR="3a82f5"; WAIT_COLOR="e67e22"
-    CONFIG_FILE="$HOME/.claude/hooks/iterm-status.conf"
+    CONFIG_FILE="$HOME/.claude/hooks/headsup-status.conf"
     # shellcheck source=/dev/null
     [ -f "$CONFIG_FILE" ] && source "$CONFIG_FILE" 2>/dev/null || true
 
@@ -205,7 +205,7 @@ if [ -n "$UUID" ] && [ -x "$RESYNC" ]; then
         attn="${rest#*:}"
         step "Step 5-7: push $label color=$color attn=$attn"
         if ! "$RESYNC" "$UUID" "$color" "$attn" >/dev/null 2>&1; then
-            fail "iterm-resync.sh returned non-zero for $label"
+            fail "headsup-resync.sh returned non-zero for $label"
             continue
         fi
         # Confirm state file got written

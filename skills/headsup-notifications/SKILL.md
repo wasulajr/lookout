@@ -1,11 +1,11 @@
 ---
-name: iterm-notifications
-description: Manage the macOS notification that fires when a Claude Code tab has been waiting on the user for more than N minutes. Use when the user types /iterm-notifications, asks to enable/disable the "Claude is waiting" notification, wants to change how long it waits before notifying, or wants to test that notifications are working. Accepts on/off, a numeric threshold (minutes), "test" to fire a one-off notification, and "sound <name|none>" to change the alert sound.
+name: headsup-notifications
+description: Manage the macOS notification that fires when a Claude Code tab has been waiting on the user for more than N minutes. Use when the user types /headsup-notifications, asks to enable/disable the "Claude is waiting" notification, wants to change how long it waits before notifying, or wants to test that notifications are working. Accepts on/off, a numeric threshold (minutes), "test" to fire a one-off notification, and "sound <name|none>" to change the alert sound.
 ---
 
 # iTerm waiting-notifications
 
-The launchd watchdog (`claude-code.iterm-watchdog`) runs every 30 seconds. When it finds a tab whose state file has been orange (waiting) for longer than `THRESHOLD_MIN` minutes, it fires a macOS notification. This skill is the user-friendly way to toggle the feature, change the threshold, change the sound, or test that it works.
+The launchd watchdog (`claude-code.headsup-watchdog`) runs every 30 seconds. When it finds a tab whose state file has been orange (waiting) for longer than `THRESHOLD_MIN` minutes, it fires a macOS notification. This skill is the user-friendly way to toggle the feature, change the threshold, change the sound, or test that it works.
 
 Notifications are posted from the bundled `headsup-notifier.app` at `~/Library/Application Support/headsup/`, so Notification Center renders them with the headsup icon. The bundle is built and installed by `setup.sh` (Step 5/8). No third-party dependencies like terminal-notifier are required.
 
@@ -13,22 +13,22 @@ Notifications are posted from the bundled `headsup-notifier.app` at `~/Library/A
 
 | Form                              | Effect                                                                 |
 |-----------------------------------|------------------------------------------------------------------------|
-| `/iterm-notifications`            | Show current state (enabled / threshold / sound)                       |
-| `/iterm-notifications on`         | Enable notifications                                                   |
-| `/iterm-notifications off`        | Disable notifications                                                  |
-| `/iterm-notifications <N>`        | Set threshold to N minutes (positive integer)                          |
-| `/iterm-notifications <N> on`     | Set threshold AND enable                                               |
-| `/iterm-notifications <N> off`    | Set threshold AND disable                                              |
-| `/iterm-notifications test`       | Fire a test notification right now (doesn't change config)             |
-| `/iterm-notifications sound <name>` | Set sound, any macOS system sound name (Glass, Ping, Submarine, etc.)|
-| `/iterm-notifications sound none` | Silence the notification                                               |
+| `/headsup-notifications`            | Show current state (enabled / threshold / sound)                       |
+| `/headsup-notifications on`         | Enable notifications                                                   |
+| `/headsup-notifications off`        | Disable notifications                                                  |
+| `/headsup-notifications <N>`        | Set threshold to N minutes (positive integer)                          |
+| `/headsup-notifications <N> on`     | Set threshold AND enable                                               |
+| `/headsup-notifications <N> off`    | Set threshold AND disable                                              |
+| `/headsup-notifications test`       | Fire a test notification right now (doesn't change config)             |
+| `/headsup-notifications sound <name>` | Set sound, any macOS system sound name (Glass, Ping, Submarine, etc.)|
+| `/headsup-notifications sound none` | Silence the notification                                               |
 
 ## What to do when invoked
 
 Run the helper script with the user's args. Don't try to parse the args yourself; pass them through unchanged. The helper updates the config in place and prints the resulting state.
 
 ```bash
-~/.claude/hooks/iterm-notifications.sh "$@"
+~/.claude/hooks/headsup-notifications.sh "$@"
 ```
 
 If the user just said "turn on notifications" or "enable", pass `on`. "Turn them off" or "disable" becomes `off`. "Set the threshold to 10 minutes" or "wait 10 minutes" becomes `10`. "Test it" or "send me a test" becomes `test`.
@@ -37,7 +37,7 @@ After the helper prints the new state, **don't add a long explanation**; the out
 
 ## First-run macOS permissions
 
-macOS requires per-bundle notification permission. The first time a notification fires (from `/iterm-notifications test` or a real wait), macOS shows "headsup wants to send notifications." Click **Allow**. The decision sticks to the bundle's codesigning identity, so future notifications fire silently.
+macOS requires per-bundle notification permission. The first time a notification fires (from `/headsup-notifications test` or a real wait), macOS shows "headsup wants to send notifications." Click **Allow**. The decision sticks to the bundle's codesigning identity, so future notifications fire silently.
 
 If notifications stop appearing later: System Settings, Notifications, scroll for `headsup`, ensure "Allow Notifications" is on.
 
@@ -50,7 +50,7 @@ What you see when a notification fires:
 | Slot                 | Source                                                                            |
 |----------------------|-----------------------------------------------------------------------------------|
 | Top header + icon    | `headsup` (the bundle's CFBundleName) and the orange face icon                    |
-| Title (large, bold)  | The per-tab badge from `~/.claude/hooks/.state/<uuid>.badge` (matches the iTerm2 watermark; defaults to the project name, override via `/iterm-label`) |
+| Title (large, bold)  | The per-tab badge from `~/.claude/hooks/.state/<uuid>.badge` (matches the iTerm2 watermark; defaults to the project name, override via `/headsup-label`) |
 | Subtitle             | `Claude is waiting`                                                               |
 | Body                 | `Idle for <N>m` (or longer)                                                       |
 | Sound                | `NOTIFICATION_SOUND` from conf (default `Glass`)                                  |
@@ -77,10 +77,10 @@ When you respond (UserPromptSubmit), the state file gets rewritten with a new co
 
 ## Where the supporting files live
 
-- `~/.claude/hooks/iterm-notifications.sh` is this skill's helper script
-- `~/.claude/hooks/iterm-notifications.conf` is the persisted config
-- `~/.claude/hooks/iterm-notify-waiting.sh` is the actual notifier sweep (called from the watchdog)
-- `~/.claude/hooks/iterm-watchdog.sh` calls the notifier every 30s
+- `~/.claude/hooks/headsup-notifications.sh` is this skill's helper script
+- `~/.claude/hooks/headsup-notifications.conf` is the persisted config
+- `~/.claude/hooks/headsup-notify-waiting.sh` is the actual notifier sweep (called from the watchdog)
+- `~/.claude/hooks/headsup-watchdog.sh` calls the notifier every 30s
 - `~/Library/Application Support/headsup/headsup-notifier.app` is the Swift binary that posts the notification (so macOS renders the headsup icon)
 
 All under version control at `github.com/wasulajr/headsup`.

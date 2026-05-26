@@ -7,13 +7,13 @@ Claude Code writes one JSONL per session under:
 Each "assistant" entry's `message.usage` includes input/output/cache
 token counts. This helper sums them across the file and prints a brief
 summary, suitable for embedding in an iTerm2 badge or surfacing in the
-/iterm-status skill.
+/headsup-status skill.
 
 No USD cost calculation — pricing depends on model + context size and
 the table would need maintenance. Tokens are the durable signal.
 
 Usage:
-    iterm-session-cost.py [--cwd PATH] [--jsonl PATH] [--format FORMAT]
+    headsup-session-cost.py [--cwd PATH] [--jsonl PATH] [--format FORMAT]
 
 Defaults: --cwd $PWD --format short
 Formats:  short (single line), long (multi-line breakdown), json

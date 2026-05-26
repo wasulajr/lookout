@@ -10,19 +10,19 @@
 #      (per the master memory's banner protocol) as belt-and-suspenders
 #      coverage for the current tab.
 #
-# Bypasses iterm-status.sh's event-driven path because that path depends
+# Bypasses headsup-status.sh's event-driven path because that path depends
 # on Claude Code firing PreToolUse/PostToolUse/etc. — which is the very
 # thing that goes stale in long-running sessions. We write the state file
 # DIRECTLY and fire Tier 2 (one-shot Python) regardless of daemon state.
 #
 # Usage:
-#   iterm-resync.sh                 — resync current tab (resolves
+#   headsup-resync.sh                 — resync current tab (resolves
 #                                     ITERM_SESSION_ID from parent shell)
-#   iterm-resync.sh <UUID>          — resync a specific tab by its iTerm2
+#   headsup-resync.sh <UUID>          — resync a specific tab by its iTerm2
 #                                     session UUID (with or without the
 #                                     `wXtYpZ:` prefix)
-#   iterm-resync.sh <UUID> <color>  — force a specific color (6-char hex)
-#   iterm-resync.sh <UUID> <color> <attention>
+#   headsup-resync.sh <UUID> <color>  — force a specific color (6-char hex)
+#   headsup-resync.sh <UUID> <color> <attention>
 #                                     — force a specific (color, attention) pair
 
 set -eu
@@ -50,13 +50,13 @@ else
         SESSION_FROM_ENV="${ITERM_SESSION_ID:-}"
     fi
     if [ -z "$SESSION_FROM_ENV" ]; then
-        echo "iterm-resync: ITERM_SESSION_ID not found in any ancestor shell" >&2
+        echo "headsup-resync: ITERM_SESSION_ID not found in any ancestor shell" >&2
         exit 1
     fi
     UUID="${SESSION_FROM_ENV#*:}"
 fi
 if [ -z "$UUID" ]; then
-    echo "iterm-resync: empty UUID after parsing" >&2
+    echo "headsup-resync: empty UUID after parsing" >&2
     exit 1
 fi
 
@@ -67,7 +67,7 @@ PROCESS_COLOR="3a82f5"
 IDLE_COLOR="ffffff"
 WAIT_COLOR="ffcc00"
 
-CONFIG_FILE="$HOME/.claude/hooks/iterm-status.conf"
+CONFIG_FILE="$HOME/.claude/hooks/headsup-status.conf"
 # shellcheck source=/dev/null
 [ -f "$CONFIG_FILE" ] && source "$CONFIG_FILE" 2>/dev/null || true
 
@@ -76,11 +76,11 @@ ATTENTION="${3:-no}"
 
 # Basic validation — fail fast if a caller passes garbage.
 if ! printf '%s' "$COLOR" | grep -qE '^[0-9a-fA-F]{6}$'; then
-    echo "iterm-resync: color must be 6-char hex, got '$COLOR'" >&2
+    echo "headsup-resync: color must be 6-char hex, got '$COLOR'" >&2
     exit 1
 fi
 if [ "$ATTENTION" != "no" ] && [ "$ATTENTION" != "yes" ]; then
-    echo "iterm-resync: attention must be 'no' or 'yes', got '$ATTENTION'" >&2
+    echo "headsup-resync: attention must be 'no' or 'yes', got '$ATTENTION'" >&2
     exit 1
 fi
 
@@ -93,7 +93,7 @@ printf '%s %s\n' "$COLOR" "$ATTENTION" > "$TMP"
 mv "$TMP" "$FINAL"
 
 # ── 4. Fire Tier 2 unconditionally (defense in depth) ─────────────────────
-# Unlike iterm-status.sh which only fires Tier 2 when the daemon heartbeat
+# Unlike headsup-status.sh which only fires Tier 2 when the daemon heartbeat
 # is stale, this script ALWAYS fires Tier 2 because it's the "manual
 # override" path — we don't trust the daemon when the caller is invoking
 # us. ~440ms cost; runs async, doesn't block.
@@ -105,8 +105,8 @@ if [ -x "$VENV_PYTHON" ] && [ -f "$ONESHOT_SCRIPT" ]; then
     disown 2>/dev/null || true
 fi
 
-# Debug log — same file iterm-status.sh writes to.
-LOG_FILE="$HOME/.claude/hooks/iterm-status.log"
+# Debug log — same file headsup-status.sh writes to.
+LOG_FILE="$HOME/.claude/hooks/headsup-status.log"
 if [ -f "$HOME/.claude/hooks/.debug" ]; then
     printf '%s sh resync color=%s attention=%s uuid=%s\n' \
         "$(date -u '+%FT%T.%3NZ' 2>/dev/null || date -u '+%FT%TZ')" \
