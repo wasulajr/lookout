@@ -66,15 +66,6 @@ ACCOUNT=$(jq -r '.oauthAccount.emailAddress // empty' ~/.claude.json 2>/dev/null
 [ -z "$ACCOUNT" ] && ACCOUNT="$(whoami)"
 IS_MAX=$(jq -r '.oauthAccount.organizationType // empty' ~/.claude.json 2>/dev/null)
 
-# Format token counts as 12k / 1.2M
-if   [ "$TOKENS"   -ge 1000000 ]; then USED_LABEL="$(awk "BEGIN{printf \"%.1fM\", $TOKENS/1000000}")"
-elif [ "$TOKENS"   -ge 1000    ]; then USED_LABEL="$(( TOKENS / 1000 ))k"
-else                                   USED_LABEL="$TOKENS"; fi
-if   [ "$CTX_SIZE" -ge 1000000 ]; then SIZE_LABEL="$(awk "BEGIN{printf \"%.1fM\", $CTX_SIZE/1000000}")"
-elif [ "$CTX_SIZE" -ge 1000    ]; then SIZE_LABEL="$(( CTX_SIZE / 1000 ))k"
-else                                   SIZE_LABEL="$CTX_SIZE"; fi
-TOK_LABEL="${USED_LABEL} / ${SIZE_LABEL} tok"
-
 # Tilde prefix = estimated at API rates (Max subscription); no tilde = actual charge (API key)
 if [ "$IS_MAX" = "claude_max" ]; then
     COST_LABEL="~\$$(printf '%.2f' "$COST") est"
@@ -86,7 +77,9 @@ fi
 # headsup-usage-windows.py aggregates output tokens from JSONL files and
 # caches results for 60s so this stays fast on every status line update.
 USAGE_WINDOWS_SCRIPT="$HOME/.claude/hooks/headsup-usage-windows.py"
-SESSION_PCT="" WEEK_PCT="" SESSION_RESET=""
+SESSION_PCT="" SESSION_USED="" SESSION_LIMIT_FMT="" SESSION_COST=""
+WEEK_PCT=""    WEEK_USED=""    WEEK_LIMIT_FMT=""    WEEK_COST=""
+SESSION_RESET=""
 if [ -f "$USAGE_WINDOWS_SCRIPT" ]; then
     eval "$(python3 "$USAGE_WINDOWS_SCRIPT" 2>/dev/null)" 2>/dev/null || true
 fi
@@ -144,14 +137,17 @@ for ((i=0; i<BAR_WIDTH; i++)); do
     [ "$i" -lt "$FILLED" ] && BAR+="▓" || BAR+="░"
 done
 
-LINE="👤 ${DIM}${ACCOUNT}${RESET}  ${DIM}${MODEL}${RESET}  Tokens: ${DIM}${USED_LABEL} / ${SIZE_LABEL}${RESET}"
+LINE="👤 ${DIM}${ACCOUNT}${RESET}  ${DIM}${MODEL}${RESET}"
 if [ "$PCT" -ge "$WARN_AT" ]; then
     LINE+="  Context: ${COLOR}${BAR} ${PCT}%${NOTE}${RESET}"
 else
     LINE+="  ${DIM}${PCT}%${RESET}"
 fi
-if [ -n "$SESSION_PCT" ] && [ -n "$WEEK_PCT" ]; then
-    LINE+="  ${DIM}S:~${SESSION_PCT}%  W:~${WEEK_PCT}%${RESET}"
+if [ -n "$SESSION_PCT" ]; then
+    LINE+="  Session: ${DIM}${SESSION_USED}/${SESSION_LIMIT_FMT} ~${SESSION_PCT}%${RESET}  ${DIM}cost ~\$${SESSION_COST}${RESET}"
+fi
+if [ -n "$WEEK_PCT" ]; then
+    LINE+="  Week: ${DIM}${WEEK_USED}/${WEEK_LIMIT_FMT} ~${WEEK_PCT}%${RESET}  ${DIM}cost ~\$${WEEK_COST}${RESET}"
 fi
 LINE+="  Cost: ${DIM}${COST_LABEL}${RESET}"
 [ -n "$BRANCH" ] && LINE+="  ${DIM}⎇ ${BRANCH}${RESET}"

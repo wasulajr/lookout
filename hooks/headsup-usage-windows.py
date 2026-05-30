@@ -1,48 +1,82 @@
 #!/usr/bin/env python3
 """headsup-usage-windows.py — approximate Claude session and week usage.
 
-Reads ~/.claude/projects/**/*.jsonl, summing output tokens (the primary
-compute metric) across two windows:
+Reads ~/.claude/projects/**/*.jsonl across two time windows:
 
   Session  current 6-hour block; blocks reset at 01:40 07:40 13:40 19:40 UTC
   Week     current week: Monday 17:00 ET (21:00 UTC) to following Monday
 
+Usage metric: output tokens (primary compute signal, used for % calculation).
+Cost metric: all token types weighted by API prices per model.
+
 Limits are approximate (reverse-engineered from /status percentages).
-Override via env vars or ~/.claude/hooks/headsup-status.conf:
+Override via env vars:
   HEADSUP_SESSION_LIMIT   default 17_000_000 output tokens per 6h block
   HEADSUP_WEEK_LIMIT      default 140_000_000 output tokens per week
 
-Outputs shell-eval-able assignment string, one line:
-  SESSION_PCT=9 WEEK_PCT=15 SESSION_RESET=9:40am
+Outputs shell-eval-able assignments on one line:
+  SESSION_PCT=9 SESSION_USED=1.5M SESSION_LIMIT=17M SESSION_COST=2.34
+  WEEK_PCT=20 WEEK_USED=21M WEEK_LIMIT=140M WEEK_COST=15.67
+  SESSION_RESET=9:40am
 
-Results are cached in /tmp/headsup_usage_cache.json for CACHE_TTL_SEC so
-the statusLine hook stays fast on every tool call.
+Results cached in /tmp/headsup_usage_cache.json for 60s.
 """
 
 import json
 import os
-import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-PROJECTS_DIR = Path.home() / ".claude" / "projects"
-CACHE_FILE   = Path("/tmp/headsup_usage_cache.json")
+PROJECTS_DIR  = Path.home() / ".claude" / "projects"
+CACHE_FILE    = Path("/tmp/headsup_usage_cache.json")
 CACHE_TTL_SEC = 60
 
 SESSION_LIMIT = int(os.environ.get("HEADSUP_SESSION_LIMIT", 17_000_000))
 WEEK_LIMIT    = int(os.environ.get("HEADSUP_WEEK_LIMIT",   140_000_000))
 
-# UTC (hour, minute) of each 6-hour session block boundary
 SESSION_RESETS_UTC = [(1, 40), (7, 40), (13, 40), (19, 40)]
+
+# API prices per million tokens (used for cost estimation)
+# Keyed by model substring; last entry is the fallback.
+MODEL_PRICES = [
+    ("claude-opus",   {"inp": 15.0, "out": 75.0,  "cr": 1.50, "cw": 18.75}),
+    ("claude-haiku",  {"inp":  0.8, "out":  4.0,  "cr": 0.08, "cw":  1.00}),
+    ("claude-sonnet", {"inp":  3.0, "out": 15.0,  "cr": 0.30, "cw":  3.75}),
+    ("",              {"inp":  3.0, "out": 15.0,  "cr": 0.30, "cw":  3.75}),  # fallback
+]
+
+
+def prices_for(model: str) -> dict:
+    for key, p in MODEL_PRICES:
+        if key in model:
+            return p
+    return MODEL_PRICES[-1][1]
+
+
+def fmt_tokens(n: int) -> str:
+    if n >= 1_000_000:
+        return f"{n / 1_000_000:.1f}M"
+    if n >= 1_000:
+        return f"{n / 1_000:.0f}k"
+    return str(n)
+
+
+def fmt_limit(n: int) -> str:
+    """Format a limit as a round number (no decimal for clean limits)."""
+    if n >= 1_000_000:
+        v = n / 1_000_000
+        return f"{v:.0f}M" if v == int(v) else f"{v:.1f}M"
+    if n >= 1_000:
+        v = n / 1_000
+        return f"{v:.0f}k" if v == int(v) else f"{v:.1f}k"
+    return str(n)
 
 
 def block_start(now: datetime) -> datetime:
-    """Start of the current 6-hour session block (UTC)."""
-    base = now.replace(second=0, microsecond=0)
-    # Check yesterday + today to handle the 01:40 UTC boundary
     candidates = []
     for day_offset in (-1, 0):
-        day = base.replace(hour=0, minute=0) + timedelta(days=day_offset)
+        day = now.replace(hour=0, minute=0, second=0, microsecond=0) \
+              + timedelta(days=day_offset)
         for h, m in SESSION_RESETS_UTC:
             t = day.replace(hour=h, minute=m)
             if t <= now:
@@ -51,11 +85,10 @@ def block_start(now: datetime) -> datetime:
 
 
 def block_next_reset(now: datetime) -> datetime:
-    """Next session block reset after now (UTC)."""
-    base = now.replace(second=0, microsecond=0)
     candidates = []
     for day_offset in (0, 1):
-        day = base.replace(hour=0, minute=0) + timedelta(days=day_offset)
+        day = now.replace(hour=0, minute=0, second=0, microsecond=0) \
+              + timedelta(days=day_offset)
         for h, m in SESSION_RESETS_UTC:
             t = day.replace(hour=h, minute=m)
             if t > now:
@@ -64,8 +97,6 @@ def block_next_reset(now: datetime) -> datetime:
 
 
 def week_start(now: datetime) -> datetime:
-    """Last Monday at 21:00 UTC (5pm ET/EDT)."""
-    # weekday(): Monday=0
     monday = now.replace(hour=21, minute=0, second=0, microsecond=0) \
              - timedelta(days=now.weekday())
     if monday > now:
@@ -73,20 +104,18 @@ def week_start(now: datetime) -> datetime:
     return monday
 
 
-def aggregate(session_start: datetime, week_start_: datetime, now: datetime):
-    """Single-pass scan: return (session_output_tokens, week_output_tokens)."""
-    session_ts = session_start.timestamp()
-    week_ts    = week_start_.timestamp()
-    s_tokens   = 0
-    w_tokens   = 0
+def aggregate(s_start: datetime, w_start: datetime):
+    """Single-pass scan over all recent JSONL files."""
+    week_ts = w_start.timestamp()
+    s = {"out": 0, "cost": 0.0}
+    w = {"out": 0, "cost": 0.0}
 
     for jsonl in PROJECTS_DIR.rglob("*.jsonl"):
         try:
             if jsonl.stat().st_mtime < week_ts:
-                continue  # file untouched since before the week window
+                continue
         except OSError:
             continue
-
         try:
             with jsonl.open(errors="replace") as fh:
                 for line in fh:
@@ -97,28 +126,38 @@ def aggregate(session_start: datetime, week_start_: datetime, now: datetime):
                     if d.get("type") != "assistant":
                         continue
                     ts_str = d.get("timestamp")
-                    usage  = d.get("message", {}).get("usage")
+                    msg    = d.get("message", {})
+                    usage  = msg.get("usage")
                     if not ts_str or not usage:
                         continue
                     try:
                         ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
                     except ValueError:
                         continue
+
                     out = usage.get("output_tokens", 0)
-                    if ts >= session_start:
-                        s_tokens += out
-                    if ts >= week_start_:
-                        w_tokens += out
+                    inp = usage.get("input_tokens", 0)
+                    cr  = usage.get("cache_read_input_tokens", 0)
+                    cw  = usage.get("cache_creation_input_tokens", 0)
+                    p   = prices_for(msg.get("model", ""))
+                    cost = (inp * p["inp"] + out * p["out"] +
+                            cr  * p["cr"]  + cw  * p["cw"]) / 1_000_000
+
+                    if ts >= s_start:
+                        s["out"]  += out
+                        s["cost"] += cost
+                    if ts >= w_start:
+                        w["out"]  += out
+                        w["cost"] += cost
         except OSError:
             continue
 
-    return s_tokens, w_tokens
+    return s, w
 
 
 def main():
     now = datetime.now(timezone.utc)
 
-    # Cache check
     try:
         if CACHE_FILE.exists():
             cached = json.loads(CACHE_FILE.read_text())
@@ -132,18 +171,28 @@ def main():
     w_start   = week_start(now)
     nxt_reset = block_next_reset(now)
 
-    s_tok, w_tok = aggregate(s_start, w_start, now)
+    s, w = aggregate(s_start, w_start)
 
-    s_pct = min(100, int(s_tok * 100 / SESSION_LIMIT))
-    w_pct = min(100, int(w_tok * 100 / WEEK_LIMIT))
+    s_pct = min(100, int(s["out"] * 100 / SESSION_LIMIT))
+    w_pct = min(100, int(w["out"] * 100 / WEEK_LIMIT))
 
-    # Reset time in local clock (no pytz needed — just shift the UTC time)
     local_reset = nxt_reset.astimezone()
     hour = local_reset.hour % 12 or 12
     ampm = "am" if local_reset.hour < 12 else "pm"
     reset_str = f"{hour}:{local_reset.minute:02d}{ampm}"
 
-    output = f"SESSION_PCT={s_pct} WEEK_PCT={w_pct} SESSION_RESET={reset_str}"
+    parts = [
+        f"SESSION_PCT={s_pct}",
+        f"SESSION_USED={fmt_tokens(s['out'])}",
+        f"SESSION_LIMIT_FMT={fmt_limit(SESSION_LIMIT)}",
+        f"SESSION_COST={s['cost']:.2f}",
+        f"WEEK_PCT={w_pct}",
+        f"WEEK_USED={fmt_tokens(w['out'])}",
+        f"WEEK_LIMIT_FMT={fmt_limit(WEEK_LIMIT)}",
+        f"WEEK_COST={w['cost']:.2f}",
+        f"SESSION_RESET={reset_str}",
+    ]
+    output = " ".join(parts)
 
     try:
         CACHE_FILE.write_text(json.dumps({"ts": now.timestamp(), "output": output}))
