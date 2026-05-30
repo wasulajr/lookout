@@ -55,7 +55,8 @@ eval "$(printf '%s' "$input" | jq -r '
     "SESSION=" + (.session_id // "default" | @sh),
     "DIR="   + (.workspace.current_dir // "." | @sh),
     "PCT=\($pct)",
-    "TOKENS=\($tok)"
+    "TOKENS=\($tok)",
+    "CTX_SIZE=\(.context_window.context_window_size // 200000)"
   ] | .[]
 ')"
 
@@ -65,10 +66,14 @@ ACCOUNT=$(jq -r '.oauthAccount.emailAddress // empty' ~/.claude.json 2>/dev/null
 [ -z "$ACCOUNT" ] && ACCOUNT="$(whoami)"
 IS_MAX=$(jq -r '.oauthAccount.organizationType // empty' ~/.claude.json 2>/dev/null)
 
-# Format token count as 12k / 1.2M
-if   [ "$TOKENS" -ge 1000000 ]; then TOK_LABEL="$(awk "BEGIN{printf \"%.1fM\", $TOKENS/1000000}") tok"
-elif [ "$TOKENS" -ge 1000    ]; then TOK_LABEL="$(( TOKENS / 1000 ))k tok"
-else                                  TOK_LABEL="${TOKENS} tok"; fi
+# Format token counts as 12k / 1.2M
+if   [ "$TOKENS"   -ge 1000000 ]; then USED_LABEL="$(awk "BEGIN{printf \"%.1fM\", $TOKENS/1000000}")"
+elif [ "$TOKENS"   -ge 1000    ]; then USED_LABEL="$(( TOKENS / 1000 ))k"
+else                                   USED_LABEL="$TOKENS"; fi
+if   [ "$CTX_SIZE" -ge 1000000 ]; then SIZE_LABEL="$(awk "BEGIN{printf \"%.1fM\", $CTX_SIZE/1000000}")"
+elif [ "$CTX_SIZE" -ge 1000    ]; then SIZE_LABEL="$(( CTX_SIZE / 1000 ))k"
+else                                   SIZE_LABEL="$CTX_SIZE"; fi
+TOK_LABEL="${USED_LABEL} / ${SIZE_LABEL} tok"
 
 # Tilde prefix = estimated at API rates (Max subscription); no tilde = actual charge (API key)
 if [ "$IS_MAX" = "claude_max" ]; then
