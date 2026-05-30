@@ -4,7 +4,7 @@ Observability for AI-native development workflows. Makes Claude Code's state gla
 
 Twenty tabs deep. You hear the Dock bounce. You glance at the tab bar. One tab is orange. That's [Claude Code](https://claude.com/claude-code) asking you a question. You switch over, answer it, watch it turn blue again, move on.
 
-Six Claude Code hooks, a persistent iTerm2 daemon, a launchd watchdog, a tiny notifier `.app` for macOS notifications, and six companion skills you can run from any session. macOS and iTerm2 only. One-line install.
+Six Claude Code hooks, a persistent iTerm2 daemon, a launchd watchdog, a tiny notifier `.app` for macOS notifications, a live status bar, and eight companion skills you can run from any session. macOS and iTerm2 only. One-line install.
 
 ## At a glance
 
@@ -20,6 +20,7 @@ Plus:
 
 - A **badge** in the top-right of every iTerm2 pane showing your project name. Stays readable when you're screen-recording or pair-programming and the tab bar isn't.
 - A **tab title** of `Claude · <project>`, pinned so Claude Code's TUI can't overwrite it mid-render.
+- A **status bar** at the bottom of every Claude Code session showing your Claude account email, current model, context window usage as a color-coded progress bar, session token count, and estimated API cost. Escalating macOS notifications fire at 90%, 95%, 96%, 97%, 98%, and 99% context usage.
 - A **kill switch** (`touch ~/.claude/hooks/.disabled`) and per-event **debug logging** (`touch ~/.claude/hooks/.debug`) for when something goes sideways.
 
 ## What's in this folder
@@ -27,13 +28,15 @@ Plus:
 ```
 headsup/
 ├── README.md                # you are here
-├── setup.sh                 # one-shot installer (run me)
+├── setup.sh                 # one-shot installer (run me; pulls latest first)
 ├── hooks/
 │   ├── headsup-status.sh             # bash entry point. Claude Code hooks call this.
 │   ├── headsup-status.conf           # color + badge defaults (edit to customize)
-│   ├── iterm2-daemon.py            # persistent daemon that talks to iTerm2's Python API
-│   ├── iterm2-apply-once.py        # one-shot fallback when the daemon isn't available
-│   ├── iterm2-set-tab-color.py     # standalone helper for ad-hoc testing
+│   ├── headsup-context-bar.sh        # statusLine: account email, model, ctx bar, tokens, cost
+│   ├── headsup-update.sh             # pull latest from GitHub (used by /headsup-update)
+│   ├── iterm2-daemon.py              # persistent daemon that talks to iTerm2's Python API
+│   ├── iterm2-apply-once.py          # one-shot fallback when the daemon isn't available
+│   ├── iterm2-set-tab-color.py       # standalone helper for ad-hoc testing
 │   ├── headsup-resync.sh             # force a tab back into sync (used by /headsup-resync-tab)
 │   ├── headsup-watchdog.sh           # outermost safety net (run from LaunchAgent every 30s)
 │   ├── headsup-status-report.sh      # health snapshot script (used by /headsup-status)
@@ -57,10 +60,11 @@ headsup/
     ├── headsup-resync-tab/     # /headsup-resync-tab     force-resync a drifted tab
     ├── headsup-status/         # /headsup-status         passive health snapshot
     ├── headsup-diagnose/       # /headsup-diagnose       active end-to-end test
-    └── headsup-notifications/  # /headsup-notifications  toggle / threshold the wait notification
+    ├── headsup-notifications/  # /headsup-notifications  toggle / threshold the wait notification
+    └── headsup-update/         # /headsup-update         pull the latest headsup from GitHub
 ```
 
-`setup.sh` copies the `hooks/` and `skills/` contents into your `~/.claude/`, builds the notifier `.app` into `~/Library/Application Support/headsup/`, installs the watchdog LaunchAgent into `~/Library/LaunchAgents/`, and wires the events into your `~/.claude/settings.json`.
+`setup.sh` pulls the latest from GitHub, copies the `hooks/` and `skills/` contents into your `~/.claude/`, builds the notifier `.app` into `~/Library/Application Support/headsup/`, installs the watchdog LaunchAgent into `~/Library/LaunchAgents/`, and wires the events into your `~/.claude/settings.json`.
 
 ## Prerequisites
 
@@ -81,16 +85,19 @@ cd headsup
 ./setup.sh
 ```
 
-`setup.sh` is idempotent and safe to re-run. It:
+`setup.sh` is idempotent and safe to re-run. **Re-running it pulls the latest version from GitHub first**, then applies any new hooks or skills. Pass `--no-pull` to skip the pull (useful for offline installs).
 
-1. Verifies all prereqs (and tells you the `brew install` line for anything missing)
-2. Enables iTerm2's Python API if it isn't already
-3. Creates a Python venv at `~/.claude/hooks/iterm2-venv/` with the `iterm2` package
-4. Copies the hook scripts to `~/.claude/hooks/` (prompts before overwriting anything that exists and differs; backs up to `.bak`)
-5. Compiles + installs the notifier `.app` to `~/Library/Application Support/headsup/headsup-notifier.app/`. Wait notifications fire from inside the bundle so they carry the headsup icon (see *Notifier .app* below).
-6. Renders the watchdog LaunchAgent template (substituting `$HOME`) into `~/Library/LaunchAgents/claude-code.headsup-watchdog.plist` and loads it with `launchctl`. Fires every 30s as an outermost safety net (see *Self-healing* below).
-7. Copies the six skill folders to `~/.claude/skills/`
-8. Merges the hook wiring into `~/.claude/settings.json` (backs up to `.bak` if it already exists)
+Each run:
+
+1. Pulls the latest from GitHub (skipped with `--no-pull`)
+2. Verifies all prereqs (and tells you the `brew install` line for anything missing)
+3. Enables iTerm2's Python API if it isn't already
+4. Creates a Python venv at `~/.claude/hooks/iterm2-venv/` with the `iterm2` package
+5. Copies the hook scripts to `~/.claude/hooks/` (prompts before overwriting anything that exists and differs; backs up to `.bak`)
+6. Compiles + installs the notifier `.app` to `~/Library/Application Support/headsup/headsup-notifier.app/`. Wait notifications fire from inside the bundle so they carry the headsup icon (see *Notifier .app* below).
+7. Renders the watchdog LaunchAgent template (substituting `$HOME`) into `~/Library/LaunchAgents/claude-code.headsup-watchdog.plist` and loads it with `launchctl`. Fires every 30s as an outermost safety net (see *Self-healing* below).
+8. Copies the eight skill folders to `~/.claude/skills/`
+9. Merges the hook wiring into `~/.claude/settings.json` (backs up to `.bak` if it already exists)
 
 After the script finishes:
 
@@ -154,7 +161,7 @@ The watchdog fires every 30s and is a no-op on the healthy path; see *Self-heali
 
 The first time a hook fires, iTerm2 will pop up a permission dialog asking to authorize the Python script. Click **"Always Allow"**.
 
-### 7. Wire the hooks in `settings.json`
+### 7. Wire the hooks and status bar in `settings.json`
 
 If you cloned the whole repo and ran `setup.sh`, this is already done. If you merged selectively, ensure your `~/.claude/settings.json` includes:
 
@@ -167,15 +174,19 @@ If you cloned the whole repo and ran `setup.sh`, this is already done. If you me
     "UserPromptSubmit": [{ "matcher": "", "hooks": [{ "type": "command", "command": "\"$HOME/.claude/hooks/headsup-status.sh\" UserPromptSubmit" }] }],
     "PreToolUse":       [{ "matcher": "", "hooks": [{ "type": "command", "command": "\"$HOME/.claude/hooks/headsup-status.sh\" PreToolUse" }] }],
     "PostToolUse":      [{ "matcher": "", "hooks": [{ "type": "command", "command": "\"$HOME/.claude/hooks/headsup-status.sh\" PostToolUse" }] }]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "\"$HOME/.claude/hooks/headsup-context-bar.sh\""
   }
 }
 ```
 
-All six events are load-bearing. See *How it works* below for why each one matters.
+All six hook events are load-bearing. See *How it works* below for why each one matters.
 
 ### 8. Test
 
-Open a new iTerm2 tab, run `claude`, type something. The tab should turn blue while Claude is processing, then orange when it stops to ask you a question or finishes a turn. If it doesn't, see *Troubleshooting*.
+Open a new iTerm2 tab, run `claude`, type something. The tab should turn blue while Claude is processing, then orange when it stops to ask you a question or finishes a turn. The status bar should appear at the bottom of the Claude Code session. If it doesn't, see *Troubleshooting*.
 
 ## How it works
 
@@ -241,6 +252,36 @@ The shipped solution: `notifier-app/headsup-notifier.swift` is a small Cocoa app
 
 **First-run permission prompt.** The first time a notification fires, macOS shows "headsup wants to send notifications." Click Allow. The decision sticks to the bundle's codesigning identity, so future notifications fire silently. To change it later: System Settings → Notifications → headsup.
 
+### Status bar
+
+`headsup-context-bar.sh` runs as a Claude Code `statusLine` hook, rendering a live status bar at the bottom of the terminal on every tool call. It shows:
+
+```
+👤 you@example.com  claude-sonnet-4-6  ctx: ▓▓▓░░░░░░░ 38%  76k tok  ~$0.42 est  ⎇ main
+```
+
+| Field | What it shows |
+|-------|--------------|
+| `👤 you@example.com` | Claude account email, read from `~/.claude.json`. Updates automatically when you switch accounts. |
+| `claude-sonnet-4-6` | The active model. |
+| `ctx: ▓▓▓░░░░░░░ 38%` | Context window usage as a progress bar. Green below 70%, yellow at 70%+, red at 90%+. This is context window capacity, not subscription quota. |
+| `76k tok` | Total tokens consumed so far this session (input + cache + output). |
+| `~$0.42 est` | Estimated cost at API rates. The tilde and "est" appear for Claude Max (subscription) users to clarify this is an estimate, not a charge. API key users see a bare `$0.42`. |
+| `⎇ main` | Current git branch (omitted when the working directory isn't a git repo). |
+
+**Context notifications.** The status bar also fires macOS notifications as context fills up. Each threshold fires once per session and resets after `/compact` drops usage below 85%:
+
+| Threshold | Message |
+|-----------|---------|
+| 90% | Run /compact to avoid losing context |
+| 95% | Compact soon — context almost full |
+| 96% | Compact soon — context almost full |
+| 97% | Compact immediately — context nearly gone |
+| 98% | Compact immediately — context nearly gone |
+| 99% | 🚨 Compact NOW — you are about to lose context |
+
+**Thresholds are configurable** in `headsup-status.conf`. The defaults are `WARN_AT=70` (yellow bar) and `DANGER_AT=90` (red bar + notifications start).
+
 ### Why `SetColors=tab=` and `RequestAttention=` ship together
 
 iTerm2's "needs attention" state visually overrides the tab color. If a `Notification` puts the tab in attention-mode (orange + dock bounce), a subsequent blue `SetColors=tab=` write succeeds at the API level but the tab visually **stays orange** until `RequestAttention=no` is also sent. The daemon injects both sequences atomically on every state change to avoid this. See the comment in `iterm2-daemon.py:apply_state()` if you want to extend it.
@@ -256,7 +297,7 @@ The tab title (`Claude · <project>`) and badge (the watermark) are written once
 - **Log rotation.** When `headsup-status.log` exceeds 5 MB the bash hook moves it to `headsup-status.log.1` on the next invocation. One rotation kept; no unbounded growth.
 - **Stale state-file GC.** Every 5 min the daemon sweeps `.state` files whose UUID is no longer a live iTerm2 session AND whose mtime is > 24h old, dropping the file plus its `.waiting` / `.precount` sidecars. The age floor prevents deleting a state file for a tab that's briefly invisible (cold-starting, hidden window).
 
-## Six skills you can run from any Claude Code session
+## Eight skills you can run from any Claude Code session
 
 ### `/headsup-colors`: paint your tabs whatever you want
 
@@ -338,6 +379,26 @@ Defaults: enabled, 5-minute threshold, `Glass` sound. Each wait period notifies 
 
 Notifications fire from the bundled notifier `.app` and carry the headsup icon. First run prompts for permission; see *Notifier .app* under *How it works* for the full story.
 
+### `/headsup-update`: pull the latest headsup from GitHub
+
+Pulls the latest from `github.com/wasulajr/headsup` and applies it in-place. Shows a changelog before pulling, then restarts the iTerm2 daemon if `iterm2-daemon.py` changed (the watchdog respawns it within 30s).
+
+```bash
+/headsup-update
+```
+
+Or call the script directly from any terminal:
+
+```bash
+~/.claude/hooks/headsup-update.sh
+```
+
+You can also just re-run `setup.sh` — it pulls first by default.
+
+### `/headsup-colors`, `/headsup-label`, `/headsup-resync-tab`, `/headsup-status`, `/headsup-diagnose`: see above
+
+All eight skills are available from any Claude Code session. Each skill's full specification lives in its `skills/headsup-*/SKILL.md`.
+
 ## Troubleshooting
 
 ### First: run `/headsup-status` and `/headsup-diagnose`
@@ -349,8 +410,18 @@ Notifications fire from the bundled notifier `.app` and carry the headsup icon. 
 1. `/headsup-diagnose`. If step 5-7 fails, the daemon's API connection is dead or absent. Check `~/.claude/hooks/.state/daemon.stderr`.
 2. Confirm the daemon is alive: `pgrep -f iterm2-daemon.py`. If nothing, fire any Claude Code event and re-check (the bash hook spawns the daemon on demand). The launchd watchdog should also respawn it within 30s.
 3. Check the venv exists: `ls ~/.claude/hooks/iterm2-venv/bin/python`.
-4. Enable debug logging: `touch ~/.claude/hooks/.debug`. Tail `~/.claude/hooks/headsup-status.log` while triggering events. Correlate `sh fire event=X` lines with `daemon applied …` lines.
+4. Enable debug logging: `touch ~/.claude/hooks/.debug`. Tail `~/.claude/hooks/headsup-status.log` while triggering events. Correlate `sh fire event=X` lines with `daemon applied ...` lines.
 5. Confirm the Python API is enabled in iTerm2 (Settings → General → Magic → "Python API"). The first connection requires manual approval.
+
+### "Status bar isn't showing"
+
+1. Confirm `statusLine` is wired in `~/.claude/settings.json` (see the Manual install step 7 above).
+2. Restart Claude Code after adding or changing the `statusLine` setting.
+3. Run the script directly to test it: `echo '{}' | bash ~/.claude/hooks/headsup-context-bar.sh`. You should see output with the account email and model fields.
+
+### "Status bar shows wrong account email"
+
+The email is read from `~/.claude.json` at `.oauthAccount.emailAddress` on every render. If you recently switched accounts, the file updates when Claude Code processes the new login. You can verify: `jq '.oauthAccount.emailAddress' ~/.claude.json`.
 
 ### "Tab stuck in attention mode (orange but should be blue)"
 
@@ -358,7 +429,7 @@ This is the load-bearing pairing issue documented above. Run `/headsup-resync-ta
 
 ### "Notifications fire but show the wrong icon (or no icon)"
 
-Most likely the notifier `.app` wasn't built. Re-run `setup.sh` and check the *Step 5/8* output. Common causes:
+Most likely the notifier `.app` wasn't built. Re-run `setup.sh` and check the *Step 6/9* output. Common causes:
 
 - `swiftc` not on PATH. Install Xcode Command Line Tools: `xcode-select --install`.
 - macOS recorded a silent denial for the bundle ID before the icon was in place. System Settings → Notifications → look for headsup. If it's there and set to "Don't Allow," flip it on. If it's not there at all, change the bundle ID in `notifier-app/Info.plist.template` (e.g. add `.v2`) and re-run `setup.sh`; macOS treats the new ID as a fresh app and re-prompts.
@@ -388,6 +459,8 @@ To add a new state (e.g. red tab on destructive `PreToolUse`):
 3. The daemon will pick it up via the state-file format; no daemon changes needed.
 
 For new badge/title behavior, edit `headsup_badge_text()` / `headsup_title_text()` in `hooks/headsup-status.conf`. Both are bash functions and you can put any shell logic there.
+
+For status bar changes, edit `headsup-context-bar.sh` directly. The `LINE=` assembly at the bottom controls what's displayed.
 
 ## What this isn't
 
