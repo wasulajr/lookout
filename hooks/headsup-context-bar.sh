@@ -135,12 +135,12 @@ for ((i=0; i<BAR_WIDTH; i++)); do
     [ "$i" -lt "$FILLED" ] && BAR+="▓" || BAR+="░"
 done
 
-LINE="👤 ${DIM}${ACCOUNT}${RESET}  ${DIM}${MODEL}${RESET}"
+LINE="👤 ${DIM}${ACCOUNT}${RESET}  ${DIM}${MODEL}${RESET}  Tokens: ${DIM}${USED_LABEL} / ${SIZE_LABEL}${RESET}"
 if [ "$PCT" -ge "$WARN_AT" ]; then
     LINE+="  Context: ${COLOR}${BAR} ${PCT}%${NOTE}${RESET}"
 else
     LINE+="  ${DIM}${PCT}%${RESET}"
 fi
-LINE+="  ${DIM}${TOK_LABEL}${RESET}  ${DIM}${COST_LABEL}${RESET}"
+LINE+="  Cost: ${DIM}${COST_LABEL}${RESET}"
 [ -n "$BRANCH" ] && LINE+="  ${DIM}⎇ ${BRANCH}${RESET}"
 printf '%s' "$LINE"
